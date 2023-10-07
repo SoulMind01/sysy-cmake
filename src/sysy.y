@@ -1,6 +1,7 @@
 %code requires {
   #include <memory>
   #include <string>
+  #include <cstring>
   #include "AST.h"
 }
 
@@ -44,8 +45,7 @@ using namespace std;
 
 // 非终结符的类型定义
 %type <int_val> Number
-%type <ast_val> Stmt Block FuncDef
-%type <str_val> FuncType
+%type <ast_val> Stmt Block FuncDef FuncType
 %%
 
 // 开始符, CompUnit ::= FuncDef, 大括号后声明了解析完成后 parser 要做的事情
@@ -74,7 +74,7 @@ CompUnit
 FuncDef
   : FuncType IDENT '(' ')' Block {
     auto ast = new FuncDefAST();
-    ast->func_type = *unique_ptr<string>($1);
+    ast->func_type = unique_ptr<BaseAST>($1);
     ast->ident = *unique_ptr<string>($2);
     ast->block = unique_ptr<BaseAST>($5);
     $$ = ast;
@@ -83,8 +83,9 @@ FuncDef
 
 FuncType
   : INT { 
-    string *type = new string("int");
-    $$ = type;
+    auto functype = new FuncTypeAST();
+    functype->type="int";
+    $$ = functype;
   }
   ;
 
@@ -115,5 +116,14 @@ Number
 // 定义错误处理函数, 其中第二个参数是错误信息
 // parser 如果发生错误 (例如输入的程序出现了语法错误), 就会调用这个函数
 void yyerror(unique_ptr<BaseAST> &ast, const char *s) {
-  cerr << "error: " << s << endl;
+  extern int yylineno;
+  extern char *yytext;
+  int len=strlen(yytext);
+  int i;
+  char buf[512]={0};
+  for(int i=0;i<len;i++)
+  {
+    sprintf(buf,"%s%d ",buf,yytext[i]);
+  }
+  fprintf(stderr,"ERROR: %s at symbol '%s' on line %d\n", s, buf, yylineno);
 }
