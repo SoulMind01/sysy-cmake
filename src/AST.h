@@ -3,7 +3,6 @@
 #include <string>
 #include <iostream>
 
-// 所有 AST 的基类
 class BaseAST
 {
 public:
@@ -107,6 +106,6 @@ public:
 
   void DumpIR() const override
   {
-    std::cout << "ret "<<number;
+    std::cout << "ret " << number;
   }
 };

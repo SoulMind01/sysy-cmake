@@ -73,6 +73,13 @@ CompUnit
 // 这种写法会省下很多内存管理的负担
 FuncDef
   : FuncType IDENT '(' ')' Block {
+    //check if main exists
+
+    if(*$2!="main")
+    {
+      std::cerr<<"main doesn't exist.\n";
+      exit(1);
+    }
     auto ast = new FuncDefAST();
     ast->func_type = unique_ptr<BaseAST>($1);
     ast->ident = *unique_ptr<string>($2);
@@ -119,7 +126,6 @@ void yyerror(unique_ptr<BaseAST> &ast, const char *s) {
   extern int yylineno;
   extern char *yytext;
   int len=strlen(yytext);
-  int i;
   char buf[512]={0};
   for(int i=0;i<len;i++)
   {
