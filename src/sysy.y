@@ -3,6 +3,7 @@
   #include <string>
   #include <cstring>
   #include "AST.h"
+  #include "variables.h"
 }
 
 %{
@@ -11,6 +12,7 @@
 #include <memory>
 #include <string>
 #include "AST.h"
+#include "variables.h"
 
 // 声明 lexer 函数和错误处理函数
 int yylex();
@@ -44,15 +46,11 @@ using namespace std;
 %token <int_val> INT_CONST
 
 // 非终结符的类型定义
-%type <int_val> Number
-%type <ast_val> Stmt Block FuncDef FuncType
+%type <ast_val> Stmt Block FuncDef FuncType 
+%type <ast_val> Exp PrimaryExp UnaryExp Number                     //lv3
+
 %%
 
-// 开始符, CompUnit ::= FuncDef, 大括号后声明了解析完成后 parser 要做的事情
-// 之前我们定义了 FuncDef 会返回一个 str_val, 也就是字符串指针
-// 而 parser 一旦解析完 CompUnit, 就说明所有的 token 都被解析了, 即解析结束了
-// 此时我们应该把 FuncDef 返回的结果收集起来, 作为 AST 传给调用 parser 的函数
-// $1 指代规则里第一个符号的返回值, 也就是 FuncDef 的返回值
 CompUnit
   : FuncDef {
     auto comp_unit = make_unique<CompUnitAST>();
@@ -61,20 +59,9 @@ CompUnit
   }
   ;
 
-// FuncDef ::= FuncType IDENT '(' ')' Block;
-// 我们这里可以直接写 '(' 和 ')', 因为之前在 lexer 里已经处理了单个字符的情况
-// 解析完成后, 把这些符号的结果收集起来, 然后拼成一个新的字符串, 作为结果返回
-// $$ 表示非终结符的返回值, 我们可以通过给这个符号赋值的方法来返回结果
-// 你可能会问, FuncType, IDENT 之类的结果已经是字符串指针了
-// 为什么还要用 unique_ptr 接住它们, 然后再解引用, 把它们拼成另一个字符串指针呢
-// 因为所有的字符串指针都是我们 new 出来的, new 出来的内存一定要 delete
-// 否则会发生内存泄漏, 而 unique_ptr 这种智能指针可以自动帮我们 delete
-// 虽然此处你看不出用 unique_ptr 和手动 delete 的区别, 但当我们定义了 AST 之后
-// 这种写法会省下很多内存管理的负担
 FuncDef
   : FuncType IDENT '(' ')' Block {
     //check if main exists
-
     if(*$2!="main")
     {
       std::cerr<<"main doesn't exist.\n";
@@ -105,23 +92,75 @@ Block
   ;
 
 Stmt
-  : RETURN Number ';' {
+  : RETURN Exp ';' {
     auto stmt = new StmtAST();
-    stmt->number = ($2);
+    stmt->exp = unique_ptr<BaseAST>($2);
     $$ = stmt;
+  }
+  ;
+
+Exp
+  : UnaryExp {
+    auto exp = new ExpAST();
+    exp->unaryexp = unique_ptr<BaseAST>($1);
+    $$ = exp;
+  }
+  ;
+
+PrimaryExp
+  : '(' Exp ')' {
+    auto primaryexp = new PrimaryExpAST();
+    primaryexp->exp = unique_ptr<BaseAST>($2);
+    primaryexp->type = PrimaryExpType::Exp;
+    $$ = primaryexp;
+  } 
+  | Number {
+    auto primaryexp = new PrimaryExpAST();
+    primaryexp->number = unique_ptr<BaseAST>($1);
+    primaryexp->type = PrimaryExpType::Number;
+    $$ = primaryexp;
   }
   ;
 
 Number
   : INT_CONST {
-    $$ = ($1);
+    auto number = new NumberAST();
+    number-> int_const = ($1);
+    $$ = number;
   }
   ;
 
+UnaryExp
+  : PrimaryExp {
+    auto unaryexp = new UnaryExpAST();
+    unaryexp->primaryexp = unique_ptr<BaseAST>($1);
+    unaryexp->type = UnaryExpType::PrimaryExp;
+    $$ = unaryexp;
+  }
+  | '!' UnaryExp {
+    auto unaryexp = new UnaryExpAST();
+    unaryexp->unaryop = '!';
+    unaryexp->unaryexp = unique_ptr<BaseAST>($2);
+    unaryexp->type = UnaryExpType::UnaryOp;
+    $$ = unaryexp;
+  }
+  | '-' UnaryExp {
+    auto unaryexp = new UnaryExpAST();
+    unaryexp->unaryop = '-';
+    unaryexp->unaryexp = unique_ptr<BaseAST>($2);
+    unaryexp->type = UnaryExpType::UnaryOp;
+    $$ = unaryexp;
+  }
+  | '+' UnaryExp {
+    auto unaryexp = new UnaryExpAST();
+    unaryexp->unaryop = '+';
+    unaryexp->unaryexp = unique_ptr<BaseAST>($2);
+    unaryexp->type = UnaryExpType::UnaryOp;
+    $$ = unaryexp;
+  }
+
 %%
 
-// 定义错误处理函数, 其中第二个参数是错误信息
-// parser 如果发生错误 (例如输入的程序出现了语法错误), 就会调用这个函数
 void yyerror(unique_ptr<BaseAST> &ast, const char *s) {
   extern int yylineno;
   extern char *yytext;

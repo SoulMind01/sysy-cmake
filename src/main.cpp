@@ -32,7 +32,7 @@ int main(int argc, const char *argv[])
   if (string(mode) == "-koopa")
   {
     freopen(output, "w", stdout);
-    ast->DumpIR();
+    cout<<ast->DumpIR();
     return 0;
   }
   else if(string(mode)=="-riscv")
@@ -40,7 +40,7 @@ int main(int argc, const char *argv[])
     stringstream ss;
     streambuf *cout_buf = cout.rdbuf();
     cout.rdbuf(ss.rdbuf());
-    ast->DumpIR();
+    cout<<ast->DumpIR();
     fflush(stdout);
     string ir_str = ss.str();
     const char *ir = ir_str.data();
