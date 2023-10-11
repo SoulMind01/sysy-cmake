@@ -96,3 +96,5 @@ b func
 p var.c_str()
 
 ```
+
+### the "or", "and" in koopaIR is '|', '&', not '||', '&&'

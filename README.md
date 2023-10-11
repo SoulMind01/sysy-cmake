@@ -6,17 +6,22 @@
 # The implemented EBNF:
 
 ```EBNFV
-CompUnit  ::= FuncDef;
+CompUnit    ::= FuncDef;
 
-FuncDef   ::= FuncType IDENT "(" ")" Block;
-FuncType  ::= "int";
+FuncDef     ::= FuncType IDENT "(" ")" Block;
+FuncType    ::= "int";
 
-Block     ::= "{" Stmt "}";
-Stmt      ::= "return" Exp ";";
+Block       ::= "{" Stmt "}";
+Stmt        ::= "return" Exp ";";
 
-Exp       ::= UnaryExp;
-PrimaryExp::="(" Exp ")" | Number;
-Number    ::= INT_CONST;
-UnaryExp  ::=PrimaryExp | UnaryOp UnaryExp;
-
+Exp         ::= LOrExp;
+PrimaryExp  ::= "(" Exp ")" | Number;
+Number      ::= INT_CONST;
+UnaryExp    ::= PrimaryExp | ('+'|'-'|'!') UnaryExp;
+MulExp      ::= UnaryExp | MulExp ("*" | "/" | "%") UnaryExp;
+AddExp      ::= MulExp | AddExp ("+" | "-") MulExp;
+RelExp      ::= AddExp | RelExp ("<" | ">" | "<=" | ">=") AddExp;
+EqExp       ::= RelExp | EqExp ("==" | "!=") RelExp;
+LAndExp     ::= EqExp | LAndExp "&&" EqExp;
+LOrExp      ::= LAndExp | LOrExp "||" LAndExp;
 ```

@@ -22,6 +22,42 @@ enum class UnaryExpType
   UnaryOp
 };
 
+enum class MulExpType
+{
+  UnaryExp,
+  MulExp
+};
+
+enum class AddExpType
+{
+  MulExp,
+  AddExp
+};
+
+enum class RelExpType
+{
+  AddExp,
+  RelExp
+};
+
+enum class EqExpType
+{
+  RelExp,
+  EqExp
+};
+
+enum class LAndExpType
+{
+  EqExp,
+  LAndExp
+};
+
+enum class LOrExpType
+{
+  LAndExp,
+  LOrExp
+};
+
 class BaseAST
 {
 public:
@@ -29,6 +65,11 @@ public:
 
   virtual void Dump() const = 0;
   virtual string DumpIR() const = 0;
+  virtual int Calc() const
+  {
+    assert(false);
+    return -1;
+  }
 };
 
 class CompUnitAST : public BaseAST
@@ -67,7 +108,7 @@ public:
 
   string DumpIR() const override
   {
-    cout << "fun @" << ident << "(): i32 {"<<endl ;
+    cout << "fun @" << ident << "(): i32 {" << endl;
     cout << block->DumpIR();
     cout << endl
          << "}";
@@ -127,34 +168,333 @@ public:
   {
     string res = "\tret " + exp->DumpIR();
     return res;
-    /*
-    string res = exp->DumpIR();
-    if (now)
-    {
-      return "\tret %" + res;
-    }
-    else
-    {
-      return "\tret " + res;
-    }
-    */
   }
 };
 
 class ExpAST : public BaseAST
 {
 public:
-  unique_ptr<BaseAST> unaryexp;
+  unique_ptr<BaseAST> lorexp;
 
   void Dump() const override
   {
     cout << "ExpAST { ";
-    unaryexp->Dump();
+    lorexp->Dump();
     cout << " }";
   }
+
   string DumpIR() const override
   {
-    return unaryexp->DumpIR();
+    return lorexp->DumpIR();
+  }
+};
+
+class MulExpAST : public BaseAST
+{
+public:
+  unique_ptr<BaseAST> unaryexp;
+  unique_ptr<BaseAST> mulexp;
+  char op;
+  MulExpType type;
+
+  void Dump() const override
+  {
+    if (type == MulExpType::UnaryExp)
+    {
+      cout << "MulExpAST { ";
+      unaryexp->Dump();
+      cout << " }";
+    }
+    else
+    {
+      cout << "MulExpAST {";
+      mulexp->Dump();
+      unaryexp->Dump();
+      cout << " }";
+    }
+  }
+
+  string DumpIR() const override
+  {
+    if (type == MulExpType::UnaryExp)
+    {
+      return unaryexp->DumpIR();
+    }
+    else
+    {
+      string prenode1 = mulexp->DumpIR();
+      string prenode2 = unaryexp->DumpIR();
+      string rd = "%" + to_string(now);
+      now++;
+      if (op == '*')
+      {
+        cout << "\t" << rd << " = mul " << prenode1 << ", " << prenode2 << endl;
+      }
+      else if (op == '/')
+      {
+        cout << "\t" << rd << " = div " << prenode1 << ", " << prenode2 << endl;
+      }
+      else
+      {
+        cout << "\t" << rd << " = mod " << prenode1 << ", " << prenode2 << endl;
+      }
+      return rd;
+    }
+  }
+};
+
+class AddExpAST : public BaseAST
+{
+public:
+  unique_ptr<BaseAST> mulexp;
+  unique_ptr<BaseAST> addexp;
+  char op;
+  AddExpType type;
+
+  void Dump() const override
+  {
+    if (type == AddExpType::MulExp)
+    {
+      cout << "AddExpAST {";
+      mulexp->Dump();
+      cout << " }";
+    }
+    else
+    {
+      cout << "AddExpAST {";
+      addexp->Dump();
+      mulexp->Dump();
+      cout << " }";
+    }
+  }
+
+  string DumpIR() const override
+  {
+    if (type == AddExpType::MulExp)
+    {
+      return mulexp->DumpIR();
+    }
+    else
+    {
+      string prenode1 = addexp->DumpIR();
+      string prenode2 = mulexp->DumpIR();
+      string rd = "%" + to_string(now);
+      now++;
+      if (op == '+')
+      {
+        cout << "\t" << rd << " = "
+             << "add " << prenode1 << ", " << prenode2 << endl;
+      }
+      else
+      {
+        cout << "\t" << rd << " = "
+             << "sub " << prenode1 << ", " << prenode2 << endl;
+      }
+      return rd;
+    }
+  }
+};
+
+class RelExpAST : public BaseAST
+{
+public:
+  RelExpType type;
+
+  string relation;
+
+  unique_ptr<BaseAST> addexp;
+  unique_ptr<BaseAST> relexp;
+
+  void Dump() const override
+  {
+    cout << "RelExpAST {";
+    if (type == RelExpType::RelExp)
+    {
+      relexp->Dump();
+    }
+    else
+    {
+      relexp->Dump();
+      addexp->Dump();
+    }
+    cout << " }";
+  }
+
+  string DumpIR() const override
+  {
+    if (type == RelExpType::AddExp)
+    {
+      return addexp->DumpIR();
+    }
+    else
+    {
+      string prenode1 = relexp->DumpIR();
+      string prenode2 = addexp->DumpIR();
+      string rd = "%" + to_string(now);
+      now++;
+      if (relation == "<")
+      {
+        cout << "\t" << rd << " = lt " << prenode1 << ", " << prenode2 << endl;
+      }
+      else if (relation == ">")
+      {
+        cout << "\t" << rd << " = gt " << prenode1 << ", " << prenode2 << endl;
+      }
+      else if (relation == "<=")
+      {
+        cout << "\t" << rd << " = le " << prenode1 << ", " << prenode2 << endl;
+      }
+      else
+      {
+        cout << "\t" << rd << " = ge " << prenode1 << ", " << prenode2 << endl;
+      }
+      return rd;
+    }
+  }
+};
+
+class EqExpAST : public BaseAST
+{
+public:
+  EqExpType type;
+
+  string relation;
+
+  unique_ptr<BaseAST> eqexp;
+  unique_ptr<BaseAST> relexp;
+
+  void Dump() const override
+  {
+    cout << "EqExpAST {";
+    if (type == EqExpType::RelExp)
+    {
+      relexp->Dump();
+    }
+    else
+    {
+      eqexp->Dump();
+      relexp->Dump();
+    }
+    cout << " }";
+  }
+
+  string DumpIR() const override
+  {
+    if (type == EqExpType::RelExp)
+    {
+      return relexp->DumpIR();
+    }
+    else
+    {
+      string prenode1 = eqexp->DumpIR();
+      string prenode2 = relexp->DumpIR();
+      string rd = "%" + to_string(now);
+      now++;
+      if (relation == "==")
+      {
+        cout << "\t" << rd << " = eq " << prenode1 << ", " << prenode2 << endl;
+      }
+      else
+      {
+        cout << "\t" << rd << " = ne " << prenode1 << ", " << prenode2 << endl;
+      }
+      return rd;
+    }
+  }
+};
+
+class LAndExpAST : public BaseAST
+{
+public:
+  LAndExpType type;
+
+  unique_ptr<BaseAST> eqexp;
+  unique_ptr<BaseAST> landexp;
+
+  void Dump() const override
+  {
+    cout << "LAndExpAST {";
+    if (type == LAndExpType::EqExp)
+    {
+      eqexp->Dump();
+    }
+    else
+    {
+      landexp->Dump();
+      eqexp->Dump();
+    }
+    cout << " }";
+  }
+
+  string DumpIR() const override
+  {
+    if (type == LAndExpType::EqExp)
+    {
+      return eqexp->DumpIR();
+    }
+    else
+    {
+      string prenode1 = eqexp->DumpIR();
+      string prenode2 = landexp->DumpIR();
+      cout << "\t%" + to_string(now) << " = eq " << prenode1 << ", 0" << endl;
+      now++;
+      string sub1 = "%" + to_string(now);
+      cout << "\t" << sub1 << " = eq "
+           << "%" + to_string(now - 1) << ", 0" << endl;
+      now++;
+      cout << "\t%" + to_string(now) << " = eq " << prenode2 << ", 0" << endl;
+      now++;
+      string sub2 = "%" + to_string(now);
+      cout << "\t" << sub2 << " = eq "
+           << "%" + to_string(now - 1) << ", 0" << endl;
+      now++;
+      string rd = "%" + to_string(now);
+      now++;
+      cout << "\t" << rd << " = and " << sub1 << ", " << sub2 << endl;
+      return rd;
+    }
+  }
+};
+
+class LOrExpAST : public BaseAST
+{
+public:
+  LOrExpType type;
+
+  unique_ptr<BaseAST> landexp;
+  unique_ptr<BaseAST> lorexp;
+
+  void Dump() const override
+  {
+    cout << "LOrExp {";
+    if (type == LOrExpType::LAndExp)
+    {
+      landexp->Dump();
+    }
+    else
+    {
+      lorexp->Dump();
+      landexp->Dump();
+    }
+    cout << " }";
+  }
+
+  string DumpIR() const override
+  {
+    if (type == LOrExpType::LAndExp)
+    {
+      return landexp->DumpIR();
+    }
+    else
+    {
+      string prenode1 = lorexp->DumpIR();
+      string prenode2 = landexp->DumpIR();
+      string tmp = "%" + to_string(now++);
+      string rd = "%" + to_string(now++);
+      cout << "\t" << tmp << " = or " << prenode1 << ", " << prenode2 << endl;
+      cout << "\t" << rd << " = ne " << tmp << ", 0" << endl;
+      return rd;
+    }
   }
 };
 
@@ -200,9 +540,15 @@ public:
   {
     cout << "NumberAST { " << int_const << " }";
   }
+
   string DumpIR() const override
   {
     return to_string(int_const);
+  }
+
+  int Calc() const override
+  {
+    return int_const;
   }
 };
 
@@ -228,6 +574,7 @@ public:
     }
     cout << " }";
   }
+
   string DumpIR() const override
   {
     if (type == UnaryExpType::PrimaryExp)
@@ -237,27 +584,23 @@ public:
     else
     {
       string prenode = unaryexp->DumpIR();
+      string rd = "%" + to_string(now);
+      now++;
       if (unaryop == '+')
       {
         return prenode;
       }
       else if (unaryop == '-')
       {
-        cout << "\t%" + to_string(now) + " = sub 0, " + prenode << endl;
+        cout << "\t" + rd + " = sub 0, " + prenode << endl;
         now++;
-        return "%" + to_string(now - 1);
-      }
-      else if (unaryop == '!')
-      {
-        cout << "\t%" + to_string(now) + " = eq " + prenode + ", 0" << endl;
-        now++;
-        return "%" + to_string(now - 1);
       }
       else
       {
-        assert(false);
-        return "";
+        cout << "\t" + rd + " = eq " + prenode + ", 0" << endl;
+        now++;
       }
+      return rd;
     }
   }
 };
