@@ -41,13 +41,14 @@ using namespace std;
 
 // lexer 返回的所有 token 种类的声明
 // 注意 IDENT 和 INT_CONST 会返回 token 的值, 分别对应 str_val 和 int_val
-%token INT RETURN LOR LAND EQ NEQ GEQ LEQ
+%token INT RETURN LOR LAND EQ NEQ GEQ LEQ CONST
 %token <str_val> IDENT
 %token <int_val> INT_CONST
 
 // 非终结符的类型定义
 %type <ast_val> Stmt Block FuncDef FuncType 
 %type <ast_val> Exp PrimaryExp UnaryExp Number AddExp MulExp RelExp EqExp LAndExp LOrExp
+%type <ast_val> Decl ConstDecl ConstDef ConstInitVal BlockItem LVal ConstExp ConstDefList BlockItemList
 %%
 
 CompUnit
@@ -83,10 +84,47 @@ FuncType
   ;
 
 Block
-  : '{' Stmt '}' {
+  : '{' '}' {
     auto block = new BlockAST();
-    block->stmt = unique_ptr<BaseAST>($2);
+    block->type = BlockType::Null;
     $$ = block;
+  }
+  | '{' BlockItemList '}' {
+    auto block = new BlockAST();
+    block->blockitemlist = unique_ptr<BaseAST>($2);
+    block->type = BlockType::BlockItemList;
+    $$ = block;
+  }
+  ;
+
+BlockItemList
+  : BlockItem {
+    auto blockitemlist = new BlockItemListAST();
+    blockitemlist->blockitem = unique_ptr<BaseAST>($1);
+    blockitemlist->type = BlockItemListType::BlockItem;
+    $$ = blockitemlist;
+  }
+  | BlockItemList BlockItem {
+    auto blockitemlist = new BlockItemListAST();
+    blockitemlist->blockitemlist = unique_ptr<BaseAST>($1);
+    blockitemlist->blockitem = unique_ptr<BaseAST>($2);
+    blockitemlist->type = BlockItemListType::BlockItemList;
+    $$ = blockitemlist;
+  }
+  ;
+
+BlockItem
+  : Decl {
+    auto blockitem = new BlockItemAST();
+    blockitem->decl = unique_ptr<BaseAST>($1);
+    blockitem->type = BlockItemType::Decl;
+    $$ = blockitem;
+  }
+  | Stmt {
+    auto blockitem = new BlockItemAST();
+    blockitem->stmt = unique_ptr<BaseAST>($1);
+    blockitem->type = BlockItemType::Stmt;
+    $$ = blockitem;
   }
   ;
 
@@ -117,6 +155,12 @@ PrimaryExp
     auto primaryexp = new PrimaryExpAST();
     primaryexp->number = unique_ptr<BaseAST>($1);
     primaryexp->type = PrimaryExpType::Number;
+    $$ = primaryexp;
+  }
+  | LVal {
+    auto primaryexp = new PrimaryExpAST();
+    primaryexp->lval = unique_ptr<BaseAST>($1);
+    primaryexp->type = PrimaryExpType::LVal;
     $$ = primaryexp;
   }
   ;
@@ -311,6 +355,79 @@ LOrExp
     lorexp-> landexp = unique_ptr<BaseAST>($3);
     lorexp->type = LOrExpType::LOrExp;
     $$ = lorexp;
+  }
+  ;
+
+Decl
+  : ConstDecl {
+    auto decl = new DeclAST();
+    decl->constdecl = unique_ptr<BaseAST>($1);
+    $$ = decl;
+  }
+  ;
+
+ConstDecl
+  : CONST INT ConstDef ';' {
+    auto constdecl = new ConstDeclAST();
+    constdecl->constdef = unique_ptr<BaseAST>($3);
+    constdecl->type = ConstDeclType::ConstDef;
+    $$ = constdecl;
+  }
+  | CONST INT ConstDefList ';' {
+    auto constdecl = new ConstDeclAST();
+    constdecl->constdeflist = unique_ptr<BaseAST>($3);
+    constdecl->type = ConstDeclType::ConstDefList;
+    $$ = constdecl;
+  }
+  ;
+
+ConstDef
+  : IDENT '=' ConstInitVal {
+    auto constdef = new ConstDefAST();
+    constdef->ident = *unique_ptr<string>($1);
+    constdef->constinitval = unique_ptr<BaseAST>($3);
+    $$ = constdef;
+  }
+  ;
+
+ConstDefList
+  : ConstDef ',' ConstDefList {
+    auto constdeflist = new ConstDefListAST();
+    constdeflist->constdef = unique_ptr<BaseAST>($1);
+    constdeflist->constdeflist = unique_ptr<BaseAST>($3);
+    constdeflist->type = ConstDefListType::ConstDefList;
+    $$ = constdeflist;
+  }
+  | ConstDef ',' ConstDef {
+    auto constdeflist = new ConstDefListAST();
+    constdeflist->constdef = unique_ptr<BaseAST>($1);
+    constdeflist->lastconstdef = unique_ptr<BaseAST>($3);
+    constdeflist->type = ConstDefListType::ConstDef;
+    $$ = constdeflist;
+  }
+  ;
+
+ConstInitVal
+  : ConstExp {
+    auto constinitval = new ConstInitValAST();
+    constinitval->constexp = unique_ptr<BaseAST>($1);
+    $$ = constinitval;
+  }
+  ;
+
+LVal
+  : IDENT {
+    auto lval = new LValAST();
+    lval->ident = *unique_ptr<string>($1);
+    $$ = lval;
+  }
+  ;
+
+ConstExp
+  : Exp {
+    auto constexp = new ConstExpAST();
+    constexp->exp = unique_ptr<BaseAST>($1);
+    $$ = constexp;
   }
   ;
 

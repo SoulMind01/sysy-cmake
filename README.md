@@ -6,22 +6,34 @@
 # The implemented EBNF:
 
 ```EBNFV
-CompUnit    ::= FuncDef;
+CompUnit        ::= FuncDef;
 
-FuncDef     ::= FuncType IDENT "(" ")" Block;
-FuncType    ::= "int";
+FuncDef         ::= FuncType IDENT "(" ")" Block;
+FuncType        ::= "int";
 
-Block       ::= "{" Stmt "}";
-Stmt        ::= "return" Exp ";";
+Block           ::= "{" {BlockItem} "}";
+BlockItem       ::= Decl | Stmt;
+Stmt            ::= "return" Exp ";";
 
-Exp         ::= LOrExp;
-PrimaryExp  ::= "(" Exp ")" | Number;
-Number      ::= INT_CONST;
-UnaryExp    ::= PrimaryExp | ('+'|'-'|'!') UnaryExp;
-MulExp      ::= UnaryExp | MulExp ("*" | "/" | "%") UnaryExp;
-AddExp      ::= MulExp | AddExp ("+" | "-") MulExp;
-RelExp      ::= AddExp | RelExp ("<" | ">" | "<=" | ">=") AddExp;
-EqExp       ::= RelExp | EqExp ("==" | "!=") RelExp;
-LAndExp     ::= EqExp | LAndExp "&&" EqExp;
-LOrExp      ::= LAndExp | LOrExp "||" LAndExp;
+Exp             ::= LOrExp;
+PrimaryExp      ::= "(" Exp ")" | LVal | Number;
+Number          ::= INT_CONST;
+UnaryExp        ::= PrimaryExp | ('+'|'-'|'!') UnaryExp;
+MulExp          ::= UnaryExp | MulExp ("*" | "/" | "%") UnaryExp;
+AddExp          ::= MulExp | AddExp ("+" | "-") MulExp;
+RelExp          ::= AddExp | RelExp ("<" | ">" | "<=" | ">=") AddExp;
+EqExp           ::= RelExp | EqExp ("==" | "!=") RelExp;
+LAndExp         ::= EqExp | LAndExp "&&" EqExp;
+LOrExp          ::= LAndExp | LOrExp "||" LAndExp;
+
+Decl            ::= ConstDecl;
+ConstDecl       ::= CONST INT ConstDef {"," ConstDef} ";";
+ConstDef        ::= IDENT "=" ConstInitVal;
+ConstInitVal    ::= ConstExp;
+
+
+LVal            ::= IDENT;
+
+ConstExp        ::= Exp;
+
 ```

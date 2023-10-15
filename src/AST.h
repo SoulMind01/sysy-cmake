@@ -13,7 +13,8 @@ extern string result_var;
 enum class PrimaryExpType
 {
   Exp,
-  Number
+  Number,
+  LVal
 };
 
 enum class UnaryExpType
@@ -56,6 +57,36 @@ enum class LOrExpType
 {
   LAndExp,
   LOrExp
+};
+
+enum class ConstDeclType
+{
+  ConstDef,
+  ConstDefList
+};
+
+enum class ConstDefListType
+{
+  ConstDefList,
+  ConstDef
+};
+
+enum class BlockType
+{
+  Null,
+  BlockItemList
+};
+
+enum class BlockItemListType
+{
+  BlockItem,
+  BlockItemList
+};
+
+enum class BlockItemType
+{
+  Decl,
+  Stmt
 };
 
 class BaseAST
@@ -135,20 +166,101 @@ public:
 class BlockAST : public BaseAST
 {
 public:
-  unique_ptr<BaseAST> stmt;
+  unique_ptr<BaseAST> blockitemlist;
+
+  BlockType type;
 
   void Dump() const override
   {
     cout << "BlockAST { ";
-    stmt->Dump();
-    cout << "}";
+    if (type == BlockType::BlockItemList)
+    {
+      blockitemlist->Dump();
+    }
+    cout << " }";
   }
 
   string DumpIR() const override
   {
-    cout << "\%entry:" << endl
-         << stmt->DumpIR();
+    cout << "\%entry:" << endl;
+    if (type == BlockType::BlockItemList)
+    {
+      cout << blockitemlist->DumpIR();
+    }
     return "";
+  }
+};
+
+class BlockItemListAST : public BaseAST
+{
+public:
+  unique_ptr<BaseAST> blockitem;
+  unique_ptr<BaseAST> blockitemlist;
+
+  BlockItemListType type;
+
+  void Dump() const override
+  {
+    cout << "BlockItemListAST {";
+    if (type == BlockItemListType::BlockItem)
+    {
+      blockitem->Dump();
+    }
+    else
+    {
+      blockitemlist->Dump();
+      blockitem->Dump();
+    }
+    cout << " }";
+  }
+
+  string DumpIR() const override
+  {
+    if (type == BlockItemListType::BlockItem)
+    {
+      cout << blockitem->DumpIR();
+    }
+    else
+    {
+      cout << blockitemlist->DumpIR();
+      cout << blockitem->DumpIR();
+    }
+    return "";
+  }
+};
+
+class BlockItemAST : public BaseAST
+{
+public:
+  unique_ptr<BaseAST> decl;
+  unique_ptr<BaseAST> stmt;
+
+  BlockItemType type;
+
+  void Dump() const override
+  {
+    cout << "BlockItemAST {";
+    if (type == BlockItemType::Decl)
+    {
+      decl->Dump();
+    }
+    else
+    {
+      stmt->Dump();
+    }
+    cout << " }";
+  }
+
+  string DumpIR() const override
+  {
+    if (type == BlockItemType::Decl)
+    {
+      return decl->DumpIR();
+    }
+    else
+    {
+      return stmt->DumpIR();
+    }
   }
 };
 
@@ -186,6 +298,11 @@ public:
   string DumpIR() const override
   {
     return lorexp->DumpIR();
+  }
+
+  int Calc() const override
+  {
+    return lorexp->Calc();
   }
 };
 
@@ -241,6 +358,22 @@ public:
       return rd;
     }
   }
+  int Calc() const override
+  {
+    if (type == MulExpType::UnaryExp)
+    {
+      return unaryexp->Calc();
+    }
+    else if (op == '*')
+    {
+      return mulexp->Calc() * unaryexp->Calc();
+    }
+    else if (op == '/')
+    {
+      return mulexp->Calc() / unaryexp->Calc();
+    }
+    return mulexp->Calc() % unaryexp->Calc();
+  }
 };
 
 class AddExpAST : public BaseAST
@@ -293,6 +426,22 @@ public:
       return rd;
     }
   }
+
+  int Calc() const override
+  {
+    if (type == AddExpType::MulExp)
+    {
+      return mulexp->Calc();
+    }
+    else if (op == '+')
+    {
+      return addexp->Calc() + mulexp->Calc();
+    }
+    else
+    {
+      return addexp->Calc() - mulexp->Calc();
+    }
+  }
 };
 
 class RelExpAST : public BaseAST
@@ -311,10 +460,10 @@ public:
     if (type == RelExpType::RelExp)
     {
       relexp->Dump();
+      addexp->Dump();
     }
     else
     {
-      relexp->Dump();
       addexp->Dump();
     }
     cout << " }";
@@ -326,29 +475,50 @@ public:
     {
       return addexp->DumpIR();
     }
+    string prenode1 = relexp->DumpIR();
+    string prenode2 = addexp->DumpIR();
+    string rd = "%" + to_string(now);
+    now++;
+    if (relation == "<")
+    {
+      cout << "\t" << rd << " = lt " << prenode1 << ", " << prenode2 << endl;
+    }
+    else if (relation == ">")
+    {
+      cout << "\t" << rd << " = gt " << prenode1 << ", " << prenode2 << endl;
+    }
+    else if (relation == "<=")
+    {
+      cout << "\t" << rd << " = le " << prenode1 << ", " << prenode2 << endl;
+    }
     else
     {
-      string prenode1 = relexp->DumpIR();
-      string prenode2 = addexp->DumpIR();
-      string rd = "%" + to_string(now);
-      now++;
-      if (relation == "<")
-      {
-        cout << "\t" << rd << " = lt " << prenode1 << ", " << prenode2 << endl;
-      }
-      else if (relation == ">")
-      {
-        cout << "\t" << rd << " = gt " << prenode1 << ", " << prenode2 << endl;
-      }
-      else if (relation == "<=")
-      {
-        cout << "\t" << rd << " = le " << prenode1 << ", " << prenode2 << endl;
-      }
-      else
-      {
-        cout << "\t" << rd << " = ge " << prenode1 << ", " << prenode2 << endl;
-      }
-      return rd;
+      cout << "\t" << rd << " = ge " << prenode1 << ", " << prenode2 << endl;
+    }
+    return rd;
+  }
+
+  int Calc() const override
+  {
+    if (type == RelExpType::AddExp)
+    {
+      return addexp->Calc();
+    }
+    else if (relation == "<")
+    {
+      return relexp->Calc() < addexp->Calc();
+    }
+    else if (relation == ">")
+    {
+      return relexp->Calc() > addexp->Calc();
+    }
+    else if (relation == "<=")
+    {
+      return relexp->Calc() <= addexp->Calc();
+    }
+    else
+    {
+      return relexp->Calc() >= addexp->Calc();
     }
   }
 };
@@ -399,6 +569,22 @@ public:
         cout << "\t" << rd << " = ne " << prenode1 << ", " << prenode2 << endl;
       }
       return rd;
+    }
+  }
+
+  int Calc() const override
+  {
+    if (type == EqExpType::RelExp)
+    {
+      return relexp->Calc();
+    }
+    else if (relation == "==")
+    {
+      return eqexp->Calc() == relexp->Calc();
+    }
+    else
+    {
+      return eqexp->Calc() != relexp->Calc();
     }
   }
 };
@@ -454,6 +640,18 @@ public:
       return rd;
     }
   }
+
+  int Calc() const override
+  {
+    if (type == LAndExpType::EqExp)
+    {
+      return eqexp->Calc();
+    }
+    else
+    {
+      return landexp->Calc() && eqexp->Calc();
+    }
+  }
 };
 
 class LOrExpAST : public BaseAST
@@ -496,6 +694,18 @@ public:
       return rd;
     }
   }
+
+  int Calc() const override
+  {
+    if (type == LOrExpType::LAndExp)
+    {
+      return landexp->Calc();
+    }
+    else
+    {
+      return lorexp->Calc() || landexp->Calc();
+    }
+  }
 };
 
 class PrimaryExpAST : public BaseAST
@@ -505,6 +715,7 @@ public:
 
   unique_ptr<BaseAST> exp;
   unique_ptr<BaseAST> number;
+  unique_ptr<BaseAST> lval;
 
   void Dump() const override
   {
@@ -513,22 +724,44 @@ public:
     {
       exp->Dump();
     }
-    else
+    else if (type == PrimaryExpType::Number)
     {
       number->Dump();
     }
+    else
+    {
+      lval->Dump();
+    }
     cout << " }";
   }
+
   string DumpIR() const override
   {
     if (type == PrimaryExpType::Exp)
     {
       return exp->DumpIR();
     }
-    else
+    else if (type == PrimaryExpType::Number)
     {
       return number->DumpIR();
     }
+    else
+    {
+      return lval->DumpIR();
+    }
+  }
+
+  int Calc() const override
+  {
+    if (type == PrimaryExpType::Exp)
+    {
+      return exp->Calc();
+    }
+    else if (type == PrimaryExpType::LVal)
+    {
+      return lval->Calc();
+    }
+    return number->Calc();
   }
 };
 
@@ -602,5 +835,226 @@ public:
       }
       return rd;
     }
+  }
+
+  int Calc() const override
+  {
+    if (type == UnaryExpType::PrimaryExp)
+    {
+      return primaryexp->Calc();
+    }
+    else if (unaryop == '-')
+    {
+      return 0 - unaryexp->Calc();
+    }
+    else if (unaryop == '!')
+    {
+      return !unaryexp->Calc();
+    }
+    return unaryexp->Calc();
+  }
+};
+
+class DeclAST : public BaseAST
+{
+public:
+  unique_ptr<BaseAST> constdecl;
+
+  void Dump() const override
+  {
+    cout << "DeclAST {";
+    constdecl->Dump();
+    cout << " }";
+  }
+
+  string DumpIR() const override
+  {
+    return constdecl->DumpIR();
+  }
+};
+
+class ConstDeclAST : public BaseAST
+{
+public:
+  unique_ptr<BaseAST> constdef;
+  unique_ptr<BaseAST> constdeflist;
+
+  ConstDeclType type;
+
+  void Dump() const override
+  {
+    cout << "ConstDeclAST {";
+    if (type == ConstDeclType::ConstDef)
+    {
+      constdef->Dump();
+    }
+    else
+    {
+      constdeflist->Dump();
+    }
+    cout << " }";
+  }
+
+  string DumpIR() const override
+  {
+    if (type == ConstDeclType::ConstDef)
+    {
+      constdef->Calc();
+      return constdef->DumpIR();
+    }
+    else
+    {
+      constdeflist->Calc();
+      return constdeflist->DumpIR();
+    }
+  }
+};
+
+class ConstDefAST : public BaseAST
+{
+public:
+  unique_ptr<BaseAST> constinitval;
+
+  string ident;
+
+  void Dump() const override
+  {
+    cout << "ConstDefAST {";
+    constinitval->Dump();
+    cout << " }";
+  }
+
+  string DumpIR() const override
+  {
+    return "";
+  }
+
+  int Calc() const override
+  {
+    ConstTable[ident] = constinitval->Calc();
+    return -1;
+  }
+};
+
+class ConstDefListAST : public BaseAST
+{
+public:
+  unique_ptr<BaseAST> constdef;
+  unique_ptr<BaseAST> constdeflist;
+  unique_ptr<BaseAST> lastconstdef;
+
+  ConstDefListType type;
+
+  void Dump() const override
+  {
+    cout << "ConstDefListAST {";
+    if (type == ConstDefListType::ConstDefList)
+    {
+      constdef->Dump();
+      constdeflist->Dump();
+    }
+    else
+    {
+      constdef->Dump();
+      lastconstdef->Dump();
+    }
+    cout << " }";
+  }
+
+  string DumpIR() const override
+  {
+    if (type == ConstDefListType::ConstDefList)
+    {
+      constdef->DumpIR();
+      constdeflist->DumpIR();
+    }
+    else
+    {
+      constdef->DumpIR();
+      lastconstdef->DumpIR();
+    }
+    return "";
+  }
+
+  int Calc() const override
+  {
+    if (type == ConstDefListType::ConstDefList)
+    {
+      constdef->Calc();
+      constdeflist->Calc();
+    }
+    else
+    {
+      constdef->Calc();
+      lastconstdef->Calc();
+    }
+    return -1;
+  }
+};
+
+class ConstInitValAST : public BaseAST
+{
+public:
+  unique_ptr<BaseAST> constexp;
+
+  void Dump() const override
+  {
+    cout << "ConstInitValAST {";
+    constexp->Dump();
+    cout << " }";
+  }
+
+  string DumpIR() const override
+  {
+    return constexp->DumpIR();
+  }
+
+  int Calc() const override
+  {
+    return constexp->Calc();
+  }
+};
+
+class LValAST : public BaseAST
+{
+public:
+  string ident;
+
+  void Dump() const override
+  {
+    cout << "LValAST { " << ident << " }";
+  }
+
+  string DumpIR() const override
+  {
+    assert(ConstTable.count(ident));
+    return to_string(ConstTable[ident]);
+  }
+
+  int Calc()const override
+  {
+    return ConstTable[ident];
+  }
+};
+
+class ConstExpAST : public BaseAST
+{
+public:
+  unique_ptr<BaseAST> exp;
+
+  void Dump() const override
+  {
+    cout << "ConstExpAST {";
+    exp->Dump();
+  }
+
+  string DumpIR() const override
+  {
+    return exp->DumpIR();
+  }
+
+  int Calc() const override
+  {
+    return exp->Calc();
   }
 };

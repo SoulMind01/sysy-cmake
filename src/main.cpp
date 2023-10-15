@@ -16,7 +16,7 @@ void IR2RV(const char *str);
 
 int main(int argc, const char *argv[])
 {
-  //compiler mode in.txt -o out.txt
+  // compiler mode in.txt -o out.txt
   assert(argc == 5);
   auto mode = argv[1];
   auto input = argv[2];
@@ -32,15 +32,15 @@ int main(int argc, const char *argv[])
   if (string(mode) == "-koopa")
   {
     freopen(output, "w", stdout);
-    cout<<ast->DumpIR();
+    cout << ast->DumpIR();
     return 0;
   }
-  else if(string(mode)=="-riscv")
+  else if (string(mode) == "-riscv")
   {
     stringstream ss;
     streambuf *cout_buf = cout.rdbuf();
     cout.rdbuf(ss.rdbuf());
-    cout<<ast->DumpIR();
+    cout << ast->DumpIR();
     fflush(stdout);
     string ir_str = ss.str();
     const char *ir = ir_str.data();
@@ -48,9 +48,13 @@ int main(int argc, const char *argv[])
     freopen(output, "w", stdout);
     IR2RV(ir);
   }
+  else if (string(mode) == "-debug")
+  {
+    ast->Dump();
+  }
   else
   {
-    cout<<"unexpected mode"<<endl;
+    cout << "unexpected mode" << endl;
   }
   return 0;
 }
@@ -58,7 +62,7 @@ void IR2RV(const char *str)
 {
   koopa_program_t program;
   koopa_error_code_t ret = koopa_parse_from_string(str, &program);
-  assert(ret == KOOPA_EC_SUCCESS); 
+  assert(ret == KOOPA_EC_SUCCESS);
   koopa_raw_program_builder_t builder = koopa_new_raw_program_builder();
   koopa_raw_program_t raw = koopa_build_raw_program(builder, program);
   koopa_delete_program(program);
