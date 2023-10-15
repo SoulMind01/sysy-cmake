@@ -49,6 +49,7 @@ using namespace std;
 %type <ast_val> Stmt Block FuncDef FuncType 
 %type <ast_val> Exp PrimaryExp UnaryExp Number AddExp MulExp RelExp EqExp LAndExp LOrExp
 %type <ast_val> Decl ConstDecl ConstDef ConstInitVal BlockItem LVal ConstExp ConstDefList BlockItemList
+%type <ast_val> VarDecl VarDef InitVal VarDefList
 %%
 
 CompUnit
@@ -132,6 +133,14 @@ Stmt
   : RETURN Exp ';' {
     auto stmt = new StmtAST();
     stmt->exp = unique_ptr<BaseAST>($2);
+    stmt->type = StmtType::RETURN;
+    $$ = stmt;
+  }
+  | LVal '=' Exp ';' {
+    auto stmt = new StmtAST();
+    stmt->lval = unique_ptr<BaseAST>($1);
+    stmt->exp = unique_ptr<BaseAST>($3);
+    stmt->type = StmtType::LVal;
     $$ = stmt;
   }
   ;
@@ -362,6 +371,13 @@ Decl
   : ConstDecl {
     auto decl = new DeclAST();
     decl->constdecl = unique_ptr<BaseAST>($1);
+    decl->type = DeclType::ConstDecl;
+    $$ = decl;
+  }
+  | VarDecl {
+    auto decl = new DeclAST();
+    decl->vardecl = unique_ptr<BaseAST>($1);
+    decl->type = DeclType::VarDecl;
     $$ = decl;
   }
   ;
@@ -412,6 +428,62 @@ ConstInitVal
     auto constinitval = new ConstInitValAST();
     constinitval->constexp = unique_ptr<BaseAST>($1);
     $$ = constinitval;
+  }
+  ;
+
+VarDecl
+  : INT VarDef ';' {
+    auto vardecl = new VarDeclAST();
+    vardecl->vardef = unique_ptr<BaseAST>($2);
+    vardecl->type = VarDeclType::VarDef;
+    $$ = vardecl;
+  }
+  | INT VarDefList ';' {
+    auto vardecl = new VarDeclAST();
+    vardecl->vardeflist = unique_ptr<BaseAST>($2);
+    vardecl->type = VarDeclType::VarDefList;
+    $$ = vardecl;
+  }
+  ;
+
+VarDef
+  : IDENT {
+    auto vardef = new VarDefAST();
+    vardef->ident = *unique_ptr<string>($1);
+    vardef->type = VarDefType::IDENT;
+    $$ = vardef;
+  }
+  | IDENT '=' InitVal {
+    auto vardef = new VarDefAST();
+    vardef->ident = *unique_ptr<string>($1);
+    vardef->initval = unique_ptr<BaseAST>($3);
+    vardef->type=VarDefType::InitVal;
+    $$ = vardef;
+  }
+  ;
+
+VarDefList
+  : VarDef ',' VarDefList {
+    auto vardeflist = new VarDefListAST();
+    vardeflist->vardef = unique_ptr<BaseAST>($1);
+    vardeflist->vardeflist = unique_ptr<BaseAST>($3);
+    vardeflist->type = VarDefListType::VarDefList;
+    $$ = vardeflist;
+  }
+  | VarDef ',' VarDef {
+    auto vardeflist = new VarDefListAST();
+    vardeflist->vardef = unique_ptr<BaseAST>($1);
+    vardeflist->lastvardef = unique_ptr<BaseAST>($3);
+    vardeflist->type = VarDefListType::VarDef;
+    $$ = vardeflist;
+  }
+  ;
+
+InitVal
+  : Exp {
+    auto initval = new InitValAST();
+    initval->exp = unique_ptr<BaseAST>($1);
+    $$ = initval;
   }
   ;
 

@@ -3,13 +3,17 @@
 #include "assert.h"
 #include <iostream>
 #include <map>
+#include <unordered_map>
 #include "variables.h"
 
 extern int now_reg;
+extern int stacksize;
+extern bool PrologueFlag;
 
 using namespace std;
 
 map<koopa_raw_value_t, string> Value_to_Reg;
+extern unordered_map<koopa_raw_value_t, int> StackTable;
 
 RegManager Reg;
 
@@ -19,9 +23,30 @@ void Visit(const koopa_raw_slice_t &slice);
 void Visit(const koopa_raw_function_t &func);
 void Visit(const koopa_raw_basic_block_t &bb);
 void Visit(const koopa_raw_value_t &value);
+void Alloc(const koopa_raw_value_t &value);
+void Store(const koopa_raw_value_t &value);
+void Load(const koopa_raw_value_t &value);
+void Binary(const koopa_raw_value_t &value);
 
 string Visit(const koopa_raw_binary_t &binary);
 string Value_to_String(const koopa_raw_value_t &value);
+
+unordered_map<koopa_raw_binary_op_t, string> BinaryTable =
+    {
+        {koopa_raw_binary_op::KOOPA_RBO_ADD, "\tadd t0, t0, t1\n"},
+        {koopa_raw_binary_op::KOOPA_RBO_SUB, "\tsub t0, t0, t1\n"},
+        {koopa_raw_binary_op::KOOPA_RBO_MUL, "\tmul t0, t0, t1\n"},
+        {koopa_raw_binary_op::KOOPA_RBO_DIV, "\tdiv t0, t0, t1\n"},
+        {koopa_raw_binary_op::KOOPA_RBO_MOD, "\trem t0, t0, t1\n"},
+        {koopa_raw_binary_op::KOOPA_RBO_LT, "\tslt t0, t0, t1\n"},
+        {koopa_raw_binary_op::KOOPA_RBO_GT, "\tsgt t0, t0, t1\n"},
+        {koopa_raw_binary_op::KOOPA_RBO_AND, "\tand t0, t0, t1\n"},
+        {koopa_raw_binary_op::KOOPA_RBO_OR, "\tor t0, t0, t1\n"},
+        {koopa_raw_binary_op::KOOPA_RBO_LE, "\tsgt t0, t0, t1\n\tseqz t0, t0\n"},
+        {koopa_raw_binary_op::KOOPA_RBO_GE, "\tslg t0, t0, t1\n\tseqz t0, t0\n"},
+        {koopa_raw_binary_op::KOOPA_RBO_EQ, "\txor t0, t0, t1\n\tseqz t0, t0\n"},
+        {koopa_raw_binary_op::KOOPA_RBO_NOT_EQ, "\txor t0, t0, t1\n\tsnez t0, t0\n"},
+};
 
 void Visit(const koopa_raw_program_t &program)
 {
@@ -60,6 +85,27 @@ void Visit(const koopa_raw_function_t &func)
     cout << "  .text" << endl;
     cout << "  .globl main" << endl;
     cout << (func->name + 1) << ":" << endl;
+    auto slice = reinterpret_cast<koopa_raw_basic_block_t>(func->bbs.buffer[0])->insts;
+    for (size_t i = 0; i < slice.len; i++)
+    {
+        auto ptr = reinterpret_cast<koopa_raw_value_t>(slice.buffer[i]);
+        if (ptr->ty->tag == koopa_raw_type_tag_t::KOOPA_RTT_UNIT)
+        {
+            continue;
+        }
+        stacksize += 4;
+    }
+    stacksize += stacksize % 16;
+    // prologue
+    if (stacksize >= -2048 && stacksize <= 2047)
+    {
+        cout << "\taddi sp, sp, " << -stacksize << endl;
+    }
+    else
+    {
+        cout << "\tli t0, " << -stacksize << endl;
+        cout << "\taddi sp, sp, t0" << endl;
+    }
     Visit(func->bbs);
 }
 
@@ -81,23 +127,30 @@ void Visit(const koopa_raw_value_t &value)
         Visit(kind.data.integer);
         break;
     case KOOPA_RVT_BINARY:
-        res = Visit(kind.data.binary);
-        Value_to_Reg[value] = res;
-        break;
+        return Binary(value);
+    case KOOPA_RVT_ALLOC:
+        return Alloc(value);
+    case KOOPA_RVT_STORE:
+        return Store(value);
+    case KOOPA_RVT_LOAD:
+        return Load(value);
     default:
         assert(false);
     }
 }
 void Visit(koopa_raw_return_t input)
 {
-    string res=Value_to_Reg[input.value];
-    if(res=="")
+    if (input.value->kind.tag == KOOPA_RVT_INTEGER)
     {
-        res=Reg.NewReg();
-        cout<<"\tli "<<res<<", "<<input.value->kind.data.integer.value<<endl;
+        cout << "\tli a0, " << input.value->kind.data.integer.value << endl;
     }
-    cout << "\tmv a0, " << res << endl
-         << "\tret";
+    else
+    {
+        cout << "\tlw a0, " << StackTable[input.value] << "(sp)" << endl;
+    }
+    // epilogue
+    cout << "\taddi sp, sp, " << stacksize << endl;
+    cout << "\tret";
 }
 
 void Visit(koopa_raw_integer_t input)
@@ -116,83 +169,83 @@ string Visit(const koopa_raw_binary_t &binary)
         left = Value_to_String(binary.lhs);
         rd = Value_to_String(binary.rhs);
         cout << "\tmul " << rd << ", " << left << ", " << rd << endl;
-        Reg.ReturnReg(now_reg-2);
+        Reg.ReturnReg(now_reg - 2);
         return rd;
     case koopa_raw_binary_op::KOOPA_RBO_DIV:
         left = Value_to_String(binary.lhs);
         rd = Value_to_String(binary.rhs);
         cout << "\tdiv " << rd << ", " << left << ", " << rd << endl;
-        Reg.ReturnReg(now_reg-2);
+        Reg.ReturnReg(now_reg - 2);
         return rd;
     case koopa_raw_binary_op::KOOPA_RBO_MOD:
         left = Value_to_String(binary.lhs);
         rd = Value_to_String(binary.rhs);
         cout << "\trem " << rd << ", " << left << ", " << rd << endl;
-        Reg.ReturnReg(now_reg-2);
+        Reg.ReturnReg(now_reg - 2);
         return rd;
     case koopa_raw_binary_op::KOOPA_RBO_EQ:
         rd = Value_to_String(binary.lhs);
         right = Value_to_String(binary.rhs);
         cout << "\txor " << rd << ", " << rd << ", " << right << endl;
         cout << "\tseqz " << rd << ", " << rd << endl;
-        Reg.ReturnReg(now_reg-1);
+        Reg.ReturnReg(now_reg - 1);
         return rd;
     case koopa_raw_binary_op::KOOPA_RBO_NOT_EQ:
         rd = Value_to_String(binary.lhs);
         right = Value_to_String(binary.rhs);
         cout << "\txor " << rd << ", " << rd << ", " << right << endl;
         cout << "\tsnez " << rd << ", " << rd << endl;
-        Reg.ReturnReg(now_reg-1);
+        Reg.ReturnReg(now_reg - 1);
         return rd;
     case koopa_raw_binary_op::KOOPA_RBO_ADD:
         left = Value_to_String(binary.lhs);
         rd = Value_to_String(binary.rhs);
         cout << "\tadd " << rd << ", " << left << ", " << rd << endl;
-        Reg.ReturnReg(now_reg-2);
+        Reg.ReturnReg(now_reg - 2);
         return rd;
     case koopa_raw_binary_op::KOOPA_RBO_SUB:
         left = Value_to_String(binary.lhs);
         rd = Value_to_String(binary.rhs);
         cout << "\tsub " << rd << ", " << left << ", " << rd << endl;
-        Reg.ReturnReg(now_reg-2);
+        Reg.ReturnReg(now_reg - 2);
         return rd;
     case koopa_raw_binary_op::KOOPA_RBO_LT:
         left = Value_to_String(binary.lhs);
         rd = Value_to_String(binary.rhs);
         cout << "\tslt " << rd << ", " << left << ", " << rd << endl;
-        Reg.ReturnReg(now_reg-2);
+        Reg.ReturnReg(now_reg - 2);
         return rd;
     case koopa_raw_binary_op::KOOPA_RBO_GT:
         left = Value_to_String(binary.lhs);
         rd = Value_to_String(binary.rhs);
         cout << "\tsgt " << rd << ", " << left << ", " << rd << endl;
-        Reg.ReturnReg(now_reg-2);
+        Reg.ReturnReg(now_reg - 2);
         return rd;
     case koopa_raw_binary_op::KOOPA_RBO_LE:
         left = Value_to_String(binary.lhs);
         rd = Value_to_String(binary.rhs);
         cout << "\tsgt " << rd << ", " << left << ", " << rd << endl;
         cout << "\tseqz " << rd << ", " << rd << endl;
-        Reg.ReturnReg(now_reg-2);
+        Reg.ReturnReg(now_reg - 2);
         return rd;
     case koopa_raw_binary_op::KOOPA_RBO_GE:
         left = Value_to_String(binary.lhs);
         rd = Value_to_String(binary.rhs);
         cout << "\tslt " << rd << ", " << left << ", " << rd << endl;
         cout << "\tseqz " << rd << ", " << rd << endl;
-        Reg.ReturnReg(now_reg-2);
+        Reg.ReturnReg(now_reg - 2);
         return rd;
     case koopa_raw_binary_op::KOOPA_RBO_AND:
         left = Value_to_String(binary.lhs);
         rd = Value_to_String(binary.rhs);
         cout << "\tand " << rd << ", " << left << ", " << rd << endl;
-        Reg.ReturnReg(now_reg-2);
+        Reg.ReturnReg(now_reg - 2);
         return rd;
     case koopa_raw_binary_op::KOOPA_RBO_OR:
         left = Value_to_String(binary.lhs);
         rd = Value_to_String(binary.rhs);
         cout << "\tor " << rd << ", " << left << ", " << rd << endl;
-        Reg.ReturnReg(now_reg-2);
+        Reg.ReturnReg(now_reg - 2);
         return rd;
     default:
         assert(false);
@@ -204,7 +257,7 @@ string Value_to_String(const koopa_raw_value_t &value)
     koopa_raw_value_tag_t tag = value->kind.tag;
     if (tag == koopa_raw_value_tag_t::KOOPA_RVT_INTEGER)
     {
-        string rd=Reg.NewReg();
+        string rd = Reg.NewReg();
         cout << "\tli " << rd << ", " << value->kind.data.integer.value << endl;
         return rd;
     }
@@ -217,4 +270,62 @@ string Value_to_String(const koopa_raw_value_t &value)
         assert(false);
         return "false";
     }
+}
+
+void Alloc(const koopa_raw_value_t &value)
+{
+    StackTable[value] = nowstack;
+    nowstack += 4;
+}
+
+void Store(const koopa_raw_value_t &value)
+{
+    koopa_raw_store_t store = value->kind.data.store;
+    koopa_raw_value_t store_value = store.value;
+    koopa_raw_value_t store_dest = store.dest;
+    if (store_value->kind.tag == KOOPA_RVT_INTEGER)
+    {
+        cout << "\tli t0, " << store_value->kind.data.integer.value << endl;
+    }
+    else
+    {
+        cout << "\tlw t0, " << StackTable[store_value] << "(sp)" << endl;
+    }
+    cout << "\tsw t0, " << StackTable[store_dest] << "(sp)" << endl;
+}
+
+void Load(const koopa_raw_value_t &value)
+{
+    koopa_raw_load_t load = value->kind.data.load;
+    koopa_raw_value_t load_source = load.src;
+    cout << "\tlw t0, " << StackTable[load_source] << "(sp)" << endl;
+    cout << "\tsw t0, " << nowstack << "(sp)" << endl;
+    StackTable[value] = nowstack;
+    nowstack += 4;
+}
+
+void Binary(const koopa_raw_value_t &value)
+{
+    koopa_raw_value_t l = value->kind.data.binary.lhs;
+    koopa_raw_value_t r = value->kind.data.binary.rhs;
+    if (l->kind.tag == KOOPA_RVT_INTEGER)
+    {
+        cout << "\tli t0, " << l->kind.data.integer.value << endl;
+    }
+    else
+    {
+        cout << "\tlw t0, " << StackTable[l] << "(sp)" << endl;
+    }
+    if (r->kind.tag == KOOPA_RVT_INTEGER)
+    {
+        cout << "\tli t1, " << r->kind.data.integer.value << endl;
+    }
+    else
+    {
+        cout << "\tlw t1, " << StackTable[r] << "(sp)" << endl;
+    }
+    cout << BinaryTable[value->kind.data.binary.op];
+    cout << "\tsw t0, " << nowstack << "(sp)" << endl;
+    StackTable[value] = nowstack;
+    nowstack += 4;
 }

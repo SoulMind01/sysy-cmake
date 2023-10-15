@@ -5,35 +5,37 @@
 
 # The implemented EBNF:
 
-```EBNFV
+```EBNF
 CompUnit        ::= FuncDef;
 
-FuncDef         ::= FuncType IDENT "(" ")" Block;
+FuncDef         ::= FuncType IDENT '(' ')' Block;
 FuncType        ::= "int";
 
-Block           ::= "{" {BlockItem} "}";
+Block           ::= "{" {BlockItem} '}';
 BlockItem       ::= Decl | Stmt;
-Stmt            ::= "return" Exp ";";
+Stmt            ::= "return" Exp ';' | LVal '=' Exp ';';
 
 Exp             ::= LOrExp;
 PrimaryExp      ::= "(" Exp ")" | LVal | Number;
 Number          ::= INT_CONST;
 UnaryExp        ::= PrimaryExp | ('+'|'-'|'!') UnaryExp;
-MulExp          ::= UnaryExp | MulExp ("*" | "/" | "%") UnaryExp;
-AddExp          ::= MulExp | AddExp ("+" | "-") MulExp;
-RelExp          ::= AddExp | RelExp ("<" | ">" | "<=" | ">=") AddExp;
+MulExp          ::= UnaryExp | MulExp ('*' | '/' | '%') UnaryExp;
+AddExp          ::= MulExp | AddExp ('+' | '-') MulExp;
+RelExp          ::= AddExp | RelExp ('<' | '>' | "<=" | ">=") AddExp;
 EqExp           ::= RelExp | EqExp ("==" | "!=") RelExp;
 LAndExp         ::= EqExp | LAndExp "&&" EqExp;
 LOrExp          ::= LAndExp | LOrExp "||" LAndExp;
 
-Decl            ::= ConstDecl;
-ConstDecl       ::= CONST INT ConstDef {"," ConstDef} ";";
+Decl            ::= ConstDecl | VarDecl;
+ConstDecl       ::= CONST INT ConstDef ';' | CONST INT ConstDefList ';';
+ConstDefList    ::= ConstDef ',' ConstDefList | ConstDef ',' ConstDef;
 ConstDef        ::= IDENT "=" ConstInitVal;
 ConstInitVal    ::= ConstExp;
-
-
+VarDecl         ::= INT VarDef ';' | INT VarDefList ';';
+VarDefList      ::= VarDef ',' VarDefList | VarDef ',' VarDef;
+VarDef          ::= IDENT | IDENT '=' InitVal;
+InitVal         ::= Exp;
 LVal            ::= IDENT;
-
 ConstExp        ::= Exp;
 
 ```

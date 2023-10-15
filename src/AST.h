@@ -89,6 +89,36 @@ enum class BlockItemType
   Stmt
 };
 
+enum class DeclType
+{
+  ConstDecl,
+  VarDecl
+};
+
+enum class StmtType
+{
+  RETURN,
+  LVal
+};
+
+enum class VarDeclType
+{
+  VarDef,
+  VarDefList
+};
+
+enum class VarDefType
+{
+  IDENT,
+  InitVal
+};
+
+enum class VarDefListType
+{
+  VarDef,
+  VarDefList
+};
+
 class BaseAST
 {
 public:
@@ -268,18 +298,40 @@ class StmtAST : public BaseAST
 {
 public:
   unique_ptr<BaseAST> exp;
+  unique_ptr<BaseAST> lval;
+
+  StmtType type;
 
   void Dump() const override
   {
     cout << "StmtAST { ";
-    exp->Dump();
+    if (type == StmtType::RETURN)
+    {
+      exp->Dump();
+    }
+    else
+    {
+      lval->Dump();
+      exp->Dump();
+    }
     cout << " }";
   }
 
   string DumpIR() const override
   {
-    string res = "\tret " + exp->DumpIR();
-    return res;
+    if (type == StmtType::RETURN)
+    {
+      return "\tret " + exp->DumpIR();
+    }
+    else
+    {
+      // lval = exp
+      string prenode1 = lval->DumpIR();
+      string prenode2 = exp->DumpIR();
+      cout << "\tstore " << prenode2 << ", @" << PtrTable[prenode1] << endl;
+      IRTable.erase(PtrTable[prenode1]);
+    }
+    return "";
   }
 };
 
@@ -859,17 +911,31 @@ class DeclAST : public BaseAST
 {
 public:
   unique_ptr<BaseAST> constdecl;
+  unique_ptr<BaseAST> vardecl;
+
+  DeclType type;
 
   void Dump() const override
   {
     cout << "DeclAST {";
-    constdecl->Dump();
+    if (type == DeclType::ConstDecl)
+    {
+      constdecl->Dump();
+    }
+    else
+    {
+      vardecl->Dump();
+    }
     cout << " }";
   }
 
   string DumpIR() const override
   {
-    return constdecl->DumpIR();
+    if (type == DeclType::ConstDecl)
+    {
+      return constdecl->DumpIR();
+    }
+    return vardecl->DumpIR();
   }
 };
 
@@ -931,7 +997,9 @@ public:
 
   int Calc() const override
   {
-    ConstTable[ident] = constinitval->Calc();
+    assert(!IdentTable.count(ident));
+    IdentTable[ident].value = constinitval->Calc();
+    IdentTable[ident].type = VarType::ConstInt;
     return -1;
   }
 };
@@ -1027,13 +1095,23 @@ public:
 
   string DumpIR() const override
   {
-    assert(ConstTable.count(ident));
-    return to_string(ConstTable[ident]);
+    if (IRTable.count(ident))
+    {
+      return IRTable[ident];
+    }
+    if (IdentTable[ident].type == VarType::Int)
+    {
+      cout << "\t%" << now++ << " = load @" << ident << endl;
+      PtrTable["%" + to_string(now - 1)] = ident;
+      IRTable[ident] = "%" + to_string(now - 1);
+      return "%" + to_string(now - 1);
+    }
+    return to_string(IdentTable[ident].value);
   }
 
-  int Calc()const override
+  int Calc() const override
   {
-    return ConstTable[ident];
+    return IdentTable[ident].value;
   }
 };
 
@@ -1046,6 +1124,167 @@ public:
   {
     cout << "ConstExpAST {";
     exp->Dump();
+  }
+
+  string DumpIR() const override
+  {
+    return exp->DumpIR();
+  }
+
+  int Calc() const override
+  {
+    return exp->Calc();
+  }
+};
+
+class VarDeclAST : public BaseAST
+{
+public:
+  unique_ptr<BaseAST> vardef;
+  unique_ptr<BaseAST> vardeflist;
+
+  VarDeclType type;
+
+  void Dump() const override
+  {
+    cout << "VarDeclAST { ";
+    if (type == VarDeclType::VarDef)
+    {
+      vardef->Dump();
+    }
+    else
+    {
+      vardeflist->Dump();
+    }
+    cout << " }";
+  }
+
+  string DumpIR() const override
+  {
+    if (type == VarDeclType::VarDef)
+    {
+      vardef->Calc();
+      return vardef->DumpIR();
+    }
+    vardeflist->Calc();
+    return vardeflist->DumpIR();
+  }
+};
+
+class VarDefListAST : public BaseAST
+{
+public:
+  unique_ptr<BaseAST> vardef;
+  unique_ptr<BaseAST> vardeflist;
+  unique_ptr<BaseAST> lastvardef;
+
+  VarDefListType type;
+
+  void Dump() const override
+  {
+    cout << "VarDefListAST { ";
+    if (type == VarDefListType::VarDef)
+    {
+      vardef->Dump();
+      lastvardef->Dump();
+    }
+    else
+    {
+      vardef->Dump();
+      vardeflist->Dump();
+    }
+    cout << " }";
+  }
+
+  string DumpIR() const override
+  {
+    if (type == VarDefListType::VarDef)
+    {
+      vardef->DumpIR();
+      lastvardef->DumpIR();
+    }
+    else
+    {
+      vardef->DumpIR();
+      vardeflist->DumpIR();
+    }
+    return "";
+  }
+
+  int Calc() const override
+  {
+    if (type == VarDefListType::VarDef)
+    {
+      vardef->Calc();
+      lastvardef->Calc();
+    }
+    else
+    {
+      vardef->Calc();
+      vardeflist->Calc();
+    }
+    return -1;
+  }
+};
+
+class VarDefAST : public BaseAST
+{
+public:
+  string ident;
+
+  unique_ptr<BaseAST> initval;
+
+  VarDefType type;
+
+  void Dump() const override
+  {
+    cout << "VarDefAST { ";
+    if (type == VarDefType::IDENT)
+    {
+      cout << ident;
+    }
+    else
+    {
+      cout << ident;
+      initval->Dump();
+    }
+    cout << " }";
+  }
+
+  string DumpIR() const override
+  {
+    cout << "\t@" << ident << " = alloc i32" << endl;
+    if (type == VarDefType::IDENT)
+    {
+      return "";
+    }
+    string prenode = initval->DumpIR();
+    cout << "\tstore " << prenode << ", @" << ident << endl;
+    return "";
+  }
+
+  int Calc() const override
+  {
+    assert(!IdentTable.count(ident));
+    IdentTable[ident].type = VarType::Int;
+    if (type == VarDefType::InitVal)
+    {
+      IdentTable[ident].value = initval->Calc();
+    }
+    return -1;
+  }
+};
+
+class InitValAST : public BaseAST
+{
+public:
+  unique_ptr<BaseAST> exp;
+
+  void Dump() const override
+  {
+    cout << "InitValAST { ";
+    exp->Dump();
+    cout << " }";
   }
 
   string DumpIR() const override

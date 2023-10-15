@@ -1,6 +1,8 @@
 {
     "files.associations": {
-        "memory": "cpp"
+        "memory": "cpp",
+        "ostream": "cpp",
+        "iostream": "cpp"
     },
     "cmake.configureOnOpen": false
 }
