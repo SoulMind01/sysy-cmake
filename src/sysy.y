@@ -136,11 +136,33 @@ Stmt
     stmt->type = StmtType::RETURN;
     $$ = stmt;
   }
+  | RETURN ';' {
+    auto stmt = new StmtAST();
+    stmt->type = StmtType::None_RETURN;
+    $$ = stmt;
+  }
   | LVal '=' Exp ';' {
     auto stmt = new StmtAST();
     stmt->lval = unique_ptr<BaseAST>($1);
     stmt->exp = unique_ptr<BaseAST>($3);
     stmt->type = StmtType::LVal;
+    $$ = stmt;
+  }
+  | Exp ';' {
+    auto stmt = new StmtAST();
+    stmt->exp = unique_ptr<BaseAST>($1);
+    stmt->type = StmtType::Exp;
+    $$ = stmt;
+  }
+  | ';' {
+    auto stmt = new StmtAST();
+    stmt->type = StmtType::None_Exp;
+    $$ = stmt;
+  }
+  | Block {
+    auto stmt = new StmtAST();
+    stmt->block = unique_ptr<BaseAST>($1);
+    stmt->type = StmtType::Block;
     $$ = stmt;
   }
   ;

@@ -98,7 +98,11 @@ enum class DeclType
 enum class StmtType
 {
   RETURN,
-  LVal
+  None_RETURN,
+  LVal,
+  Exp,
+  None_Exp,
+  Block
 };
 
 enum class VarDeclType
@@ -130,6 +134,11 @@ public:
   {
     assert(false);
     return -1;
+  }
+  virtual string getIdent() const
+  {
+    assert(false);
+    return "";
   }
 };
 
@@ -170,6 +179,7 @@ public:
   string DumpIR() const override
   {
     cout << "fun @" << ident << "(): i32 {" << endl;
+    cout << "\%entry:" << endl;
     cout << block->DumpIR();
     cout << endl
          << "}";
@@ -212,11 +222,14 @@ public:
 
   string DumpIR() const override
   {
-    cout << "\%entry:" << endl;
+    unordered_map<string, var> tmp_symbol_table;
+    unordered_map<string, string> tmp_ir_table;
+    SymbolTable.push_back(tmp_symbol_table);
     if (type == BlockType::BlockItemList)
     {
       cout << blockitemlist->DumpIR();
     }
+    SymbolTable.pop_back();
     return "";
   }
 };
@@ -299,6 +312,7 @@ class StmtAST : public BaseAST
 public:
   unique_ptr<BaseAST> exp;
   unique_ptr<BaseAST> lval;
+  unique_ptr<BaseAST> block;
 
   StmtType type;
 
@@ -309,10 +323,18 @@ public:
     {
       exp->Dump();
     }
-    else
+    else if (type == StmtType::LVal)
     {
       lval->Dump();
       exp->Dump();
+    }
+    else if (type == StmtType::Exp)
+    {
+      exp->Dump();
+    }
+    else if (type == StmtType::Block)
+    {
+      block->Dump();
     }
     cout << " }";
   }
@@ -323,13 +345,21 @@ public:
     {
       return "\tret " + exp->DumpIR();
     }
-    else
+    else if (type == StmtType::LVal)
     {
-      // lval = exp
       string prenode1 = lval->DumpIR();
       string prenode2 = exp->DumpIR();
-      cout << "\tstore " << prenode2 << ", @" << PtrTable[prenode1] << endl;
-      IRTable.erase(PtrTable[prenode1]);
+      var *tmp = getVar(lval->getIdent());
+      cout << "\tstore " << prenode2 << ", " << (*tmp).ir_symbol << endl;
+      tmp->ir_value = "";
+    }
+    else if (type == StmtType::Exp)
+    {
+      exp->DumpIR();
+    }
+    else if (type == StmtType::Block)
+    {
+      block->DumpIR();
     }
     return "";
   }
@@ -997,9 +1027,9 @@ public:
 
   int Calc() const override
   {
-    assert(!IdentTable.count(ident));
-    IdentTable[ident].value = constinitval->Calc();
-    IdentTable[ident].type = VarType::ConstInt;
+    auto &tmp_symbol_table = SymbolTable.back();
+    tmp_symbol_table[ident].value = constinitval->Calc();
+    tmp_symbol_table[ident].type = VarType::ConstInt;
     return -1;
   }
 };
@@ -1095,23 +1125,28 @@ public:
 
   string DumpIR() const override
   {
-    if (IRTable.count(ident))
+    var *tmp_var = getVar(ident);
+    if (tmp_var->type == VarType::ConstInt)
     {
-      return IRTable[ident];
+      return to_string(tmp_var->value);
     }
-    if (IdentTable[ident].type == VarType::Int)
+    if (tmp_var->ir_value == "")
     {
-      cout << "\t%" << now++ << " = load @" << ident << endl;
-      PtrTable["%" + to_string(now - 1)] = ident;
-      IRTable[ident] = "%" + to_string(now - 1);
-      return "%" + to_string(now - 1);
+      cout << "\t%" << now++ << " = load " << tmp_var->ir_symbol << endl;
+      tmp_var->ir_value = "%" + to_string(now - 1);
     }
-    return to_string(IdentTable[ident].value);
+    return tmp_var->ir_value;
   }
 
   int Calc() const override
   {
-    return IdentTable[ident].value;
+    var *tmp_var = getVar(ident);
+    return tmp_var->value;
+  }
+
+  string getIdent() const override
+  {
+    return ident;
   }
 };
 
@@ -1253,24 +1288,37 @@ public:
 
   string DumpIR() const override
   {
-    cout << "\t@" << ident << " = alloc i32" << endl;
+    assert(SymbolTable.back()[ident].ir_symbol == "");
+    var &tmp_var = SymbolTable.back()[ident];
+    tmp_var.type = VarType::Int;
+    string processed_ident = "@" + ident + "_" + to_string(SameSymbol[ident]++);
+    tmp_var.ir_symbol = processed_ident;
+    cout << "\t" << processed_ident << " = alloc i32" << endl;
     if (type == VarDefType::IDENT)
     {
       return "";
     }
-    string prenode = initval->DumpIR();
-    cout << "\tstore " << prenode << ", @" << ident << endl;
+    else
+    {
+      string prenode = initval->DumpIR();
+      cout << "\tstore " << prenode << ", " << tmp_var.ir_symbol << endl;
+    }
     return "";
   }
 
   int Calc() const override
   {
-    assert(!IdentTable.count(ident));
-    IdentTable[ident].type = VarType::Int;
-    if (type == VarDefType::InitVal)
+    var *tmp_var = findVar(ident);
+    if (!tmp_var)
     {
-      IdentTable[ident].value = initval->Calc();
+      tmp_var = &SymbolTable.back()[ident];
+      tmp_var->type = VarType::Int;
     }
+    else
+    {
+      assert(tmp_var->type == VarType::Int);
+    }
+    tmp_var->value = initval->Calc();
     return -1;
   }
 };
