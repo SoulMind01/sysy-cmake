@@ -14,7 +14,8 @@ FuncType        ::= "int";
 Block           ::= '{' '}' | '{' BlockItemList '}';
 BlockItemList   ::= BlockItem | BlockItemList BlockItem;
 BlockItem       ::= Decl | Stmt;
-Stmt            ::= RETURN Exp ';' | RETURN ';' | LVal '=' Exp ';' | Exp ';' | ';' | Block;
+Stmt            ::= RETURN Exp ';' | RETURN ';' | LVal '=' Exp ';' | Exp ';' | ';' | Block
+                    | IF '(' Exp ')' Stmt | IF '(' Exp ')' Stmt ELSE Stmt;
 
 Exp             ::= LOrExp;
 PrimaryExp      ::= "(" Exp ")" | LVal | Number;
@@ -239,3 +240,15 @@ unordered_map<koopa_raw_binary_op_t, string> BinaryTable =
 ## you can use std::vector<unordered_map<key,value>> to implement the symbol table: whenever visiting a blockAST, push a symbol table, when leaving this blockAST, pop the symbol table
 
 ## when visiting a valuedefAST, create the counterpart symbol value of the current table. Be aware of maintaining the type(const/int) of each value;
+
+# lv6:
+## you can use a global variable isjump to see whether you need to print a jump statement at the end of each block unit. Each time you start printing a new block, reset it into false
+```cpp
+      if (!isjump)
+      {
+        cout << "\tjump " << endblock << endl;
+        isjump = true;
+      }
+      cout << elseblock << ":" << endl;
+      isjump = false;
+```

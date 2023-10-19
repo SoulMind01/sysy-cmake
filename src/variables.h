@@ -86,3 +86,6 @@ static var *findVar(const string &ident)
 static int stacksize = 0;
 static unordered_map<koopa_raw_value_t, int> StackTable;
 static int nowstack = 0;
+
+static int nowif = 0;
+static bool isjump = false;

@@ -102,7 +102,9 @@ enum class StmtType
   LVal,
   Exp,
   None_Exp,
-  Block
+  Block,
+  If,
+  Else
 };
 
 enum class VarDeclType
@@ -181,8 +183,7 @@ public:
     cout << "fun @" << ident << "(): i32 {" << endl;
     cout << "\%entry:" << endl;
     cout << block->DumpIR();
-    cout << endl
-         << "}";
+    cout << "}";
     return "";
   }
 };
@@ -313,6 +314,8 @@ public:
   unique_ptr<BaseAST> exp;
   unique_ptr<BaseAST> lval;
   unique_ptr<BaseAST> block;
+  unique_ptr<BaseAST> stmtif;
+  unique_ptr<BaseAST> stmtelse;
 
   StmtType type;
 
@@ -323,6 +326,10 @@ public:
     {
       exp->Dump();
     }
+    else if (type == StmtType::None_RETURN)
+    {
+      cout << "return";
+    }
     else if (type == StmtType::LVal)
     {
       lval->Dump();
@@ -332,18 +339,39 @@ public:
     {
       exp->Dump();
     }
+    else if (type == StmtType::None_Exp)
+    {
+      cout << ";";
+    }
     else if (type == StmtType::Block)
     {
       block->Dump();
+    }
+    else if (type == StmtType::If)
+    {
+      exp->Dump();
+      stmtif->Dump();
+    }
+    else
+    {
+      exp->Dump();
+      stmtif->Dump();
+      stmtelse->Dump();
     }
     cout << " }";
   }
 
   string DumpIR() const override
   {
-    if (type == StmtType::RETURN)
+    if (!isjump && type == StmtType::RETURN)
     {
-      return "\tret " + exp->DumpIR();
+      cout << "\tret " + exp->DumpIR() << endl;
+      isjump = true;
+    }
+    else if (!isjump && type == StmtType::None_RETURN)
+    {
+      cout << "\tret" << endl;
+      isjump = true;
     }
     else if (type == StmtType::LVal)
     {
@@ -360,6 +388,48 @@ public:
     else if (type == StmtType::Block)
     {
       block->DumpIR();
+    }
+    else if (type == StmtType::If)
+    {
+      string thenblock = "%then_" + to_string(nowif);
+      string endblock = "\%end_" + to_string(nowif++);
+      string prenode = exp->DumpIR();
+      cout << "\tbr " << prenode << ", " << thenblock << ", " << endblock << endl;
+      cout << thenblock << ":" << endl;
+      stmtif->DumpIR();
+      if (!isjump)
+      {
+        cout << "\tjump " << endblock << endl;
+        isjump = true;
+      }
+      cout << endblock << ":" << endl;
+      isjump = false;
+    }
+    else if (type == StmtType::Else)
+    {
+      string thenblock = "%then_" + to_string(nowif);
+      string elseblock = "\%else_" + to_string(nowif);
+      string endblock = "\%end_" + to_string(nowif++);
+      string prenode = exp->DumpIR();
+      cout << "\tbr " << prenode << ", " << thenblock << ", " << elseblock << endl;
+      cout << thenblock << ":" << endl;
+      isjump = false;
+      stmtif->DumpIR();
+      if (!isjump)
+      {
+        cout << "\tjump " << endblock << endl;
+        isjump = true;
+      }
+      cout << elseblock << ":" << endl;
+      isjump = false;
+      stmtelse->DumpIR();
+      if (!isjump)
+      {
+        cout << "\tjump " << endblock << endl;
+        isjump = true;
+      }
+      cout << endblock << ":" << endl;
+      isjump = false;
     }
     return "";
   }
@@ -729,10 +799,11 @@ public:
     {
       return eqexp->Calc();
     }
-    else
+    if (landexp->Calc() == 0)
     {
-      return landexp->Calc() && eqexp->Calc();
+      return 0;
     }
+    return eqexp->Calc() != 0;
   }
 };
 
@@ -783,10 +854,11 @@ public:
     {
       return landexp->Calc();
     }
-    else
+    if (lorexp->Calc() == 0)
     {
-      return lorexp->Calc() || landexp->Calc();
+      return landexp->Calc() != 0;
     }
+    return 1;
   }
 };
 
@@ -1318,7 +1390,10 @@ public:
     {
       assert(tmp_var->type == VarType::Int);
     }
-    tmp_var->value = initval->Calc();
+    if (type == VarDefType::InitVal)
+    {
+      tmp_var->value = initval->Calc();
+    }
     return -1;
   }
 };

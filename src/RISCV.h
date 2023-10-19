@@ -27,6 +27,8 @@ void Alloc(const koopa_raw_value_t &value);
 void Store(const koopa_raw_value_t &value);
 void Load(const koopa_raw_value_t &value);
 void Binary(const koopa_raw_value_t &value);
+void Branch(const koopa_raw_value_t &value);
+void Jump(const koopa_raw_value_t &value);
 
 string Visit(const koopa_raw_binary_t &binary);
 string Value_to_String(const koopa_raw_value_t &value);
@@ -85,15 +87,18 @@ void Visit(const koopa_raw_function_t &func)
     cout << "  .text" << endl;
     cout << "  .globl main" << endl;
     cout << (func->name + 1) << ":" << endl;
-    auto slice = reinterpret_cast<koopa_raw_basic_block_t>(func->bbs.buffer[0])->insts;
-    for (size_t i = 0; i < slice.len; i++)
+    for (size_t j = 0; j < func->bbs.len; j++)
     {
-        auto ptr = reinterpret_cast<koopa_raw_value_t>(slice.buffer[i]);
-        if (ptr->ty->tag == koopa_raw_type_tag_t::KOOPA_RTT_UNIT)
+        auto slice = reinterpret_cast<koopa_raw_basic_block_t>(func->bbs.buffer[j])->insts;
+        for (size_t i = 0; i < slice.len; i++)
         {
-            continue;
+            auto ptr = reinterpret_cast<koopa_raw_value_t>(slice.buffer[i]);
+            if (ptr->ty->tag == koopa_raw_type_tag_t::KOOPA_RTT_UNIT)
+            {
+                continue;
+            }
+            stacksize += 4;
         }
-        stacksize += 4;
     }
     stacksize += stacksize % 16;
     // prologue
@@ -111,6 +116,10 @@ void Visit(const koopa_raw_function_t &func)
 
 void Visit(const koopa_raw_basic_block_t &bb)
 {
+    if (strcmp(bb->name + 1, "entry") != 0)
+    {
+        cout << bb->name + 1 << ":" << endl;
+    }
     Visit(bb->insts);
 }
 
@@ -134,6 +143,10 @@ void Visit(const koopa_raw_value_t &value)
         return Store(value);
     case KOOPA_RVT_LOAD:
         return Load(value);
+    case KOOPA_RVT_BRANCH:
+        return Branch(value);
+    case KOOPA_RVT_JUMP:
+        return Jump(value);
     default:
         assert(false);
     }
@@ -150,7 +163,7 @@ void Visit(koopa_raw_return_t input)
     }
     // epilogue
     cout << "\taddi sp, sp, " << stacksize << endl;
-    cout << "\tret";
+    cout << "\tret" << endl;
 }
 
 void Visit(koopa_raw_integer_t input)
@@ -234,4 +247,25 @@ void Binary(const koopa_raw_value_t &value)
     cout << "\tsw t0, " << nowstack << "(sp)" << endl;
     StackTable[value] = nowstack;
     nowstack += 4;
+}
+
+void Branch(const koopa_raw_value_t &value)
+{
+    koopa_raw_branch_t branch = value->kind.data.branch;
+    koopa_raw_value_t exp = branch.cond;
+    if (StackTable.count(exp))
+    {
+        cout << "\tlw t0, " << StackTable[exp] << "(sp)" << endl;
+    }
+    else
+    {
+        cout << "\tli t0, " << exp->kind.data.integer.value << endl;
+    }
+    cout << "\tbnez t0, " << branch.true_bb->name + 1 << endl;
+    cout << "\tj " << branch.false_bb->name + 1 << endl;
+}
+
+void Jump(const koopa_raw_value_t &value)
+{
+    cout << "\tj " << value->kind.data.jump.target->name + 1 << endl;
 }
