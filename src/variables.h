@@ -89,3 +89,12 @@ static int nowstack = 0;
 
 static int nowif = 0;
 static bool isjump = false;
+static int nowwhile = 0;
+
+struct while_info
+{
+    string while_entry;
+    string while_body;
+    string while_end;
+};
+static vector<while_info> WhileTable;

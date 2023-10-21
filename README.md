@@ -15,7 +15,8 @@ Block           ::= '{' '}' | '{' BlockItemList '}';
 BlockItemList   ::= BlockItem | BlockItemList BlockItem;
 BlockItem       ::= Decl | Stmt;
 Stmt            ::= RETURN Exp ';' | RETURN ';' | LVal '=' Exp ';' | Exp ';' | ';' | Block
-                    | IF '(' Exp ')' Stmt | IF '(' Exp ')' Stmt ELSE Stmt;
+                    | IF '(' Exp ')' Stmt | IF '(' Exp ')' Stmt ELSE Stmt | WHILE '(' Exp ')' Stmt
+                    | BREAK ';' | CONTINUE ';';
 
 Exp             ::= LOrExp;
 PrimaryExp      ::= "(" Exp ")" | LVal | Number;
@@ -252,3 +253,7 @@ unordered_map<koopa_raw_binary_op_t, string> BinaryTable =
       cout << elseblock << ":" << endl;
       isjump = false;
 ```
+
+# lv7:
+## I give up recording the recent reference(%1 = load @a, etc) of variables because it can't be used across different koopaIR block
+## when running a DumpIR() in a StmtAST, check whether a jumpcode exists, if so, just return "" without doing anything else

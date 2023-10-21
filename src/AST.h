@@ -104,7 +104,10 @@ enum class StmtType
   None_Exp,
   Block,
   If,
-  Else
+  Else,
+  While,
+  Break,
+  Continue
 };
 
 enum class VarDeclType
@@ -316,6 +319,7 @@ public:
   unique_ptr<BaseAST> block;
   unique_ptr<BaseAST> stmtif;
   unique_ptr<BaseAST> stmtelse;
+  unique_ptr<BaseAST> stmt;
 
   StmtType type;
 
@@ -352,17 +356,26 @@ public:
       exp->Dump();
       stmtif->Dump();
     }
-    else
+    else if (type == StmtType::Else)
     {
       exp->Dump();
       stmtif->Dump();
       stmtelse->Dump();
+    }
+    else if (type == StmtType::While)
+    {
+      exp->Dump();
+      stmt->Dump();
     }
     cout << " }";
   }
 
   string DumpIR() const override
   {
+    if (isjump)
+    {
+      return "";
+    }
     if (!isjump && type == StmtType::RETURN)
     {
       cout << "\tret " + exp->DumpIR() << endl;
@@ -392,27 +405,30 @@ public:
     else if (type == StmtType::If)
     {
       string thenblock = "%then_" + to_string(nowif);
-      string endblock = "\%end_" + to_string(nowif++);
+      string endblock = "\%if_end_" + to_string(nowif++);
       string prenode = exp->DumpIR();
       cout << "\tbr " << prenode << ", " << thenblock << ", " << endblock << endl;
-      cout << thenblock << ":" << endl;
+      cout << endl
+           << thenblock << ":" << endl;
       stmtif->DumpIR();
       if (!isjump)
       {
         cout << "\tjump " << endblock << endl;
         isjump = true;
       }
-      cout << endblock << ":" << endl;
+      cout << endl
+           << endblock << ":" << endl;
       isjump = false;
     }
     else if (type == StmtType::Else)
     {
       string thenblock = "%then_" + to_string(nowif);
       string elseblock = "\%else_" + to_string(nowif);
-      string endblock = "\%end_" + to_string(nowif++);
+      string endblock = "\%if_end_" + to_string(nowif++);
       string prenode = exp->DumpIR();
       cout << "\tbr " << prenode << ", " << thenblock << ", " << elseblock << endl;
-      cout << thenblock << ":" << endl;
+      cout << endl
+           << thenblock << ":" << endl;
       isjump = false;
       stmtif->DumpIR();
       if (!isjump)
@@ -420,7 +436,8 @@ public:
         cout << "\tjump " << endblock << endl;
         isjump = true;
       }
-      cout << elseblock << ":" << endl;
+      cout << endl
+           << elseblock << ":" << endl;
       isjump = false;
       stmtelse->DumpIR();
       if (!isjump)
@@ -428,8 +445,48 @@ public:
         cout << "\tjump " << endblock << endl;
         isjump = true;
       }
-      cout << endblock << ":" << endl;
+      cout << endl
+           << endblock << ":" << endl;
       isjump = false;
+    }
+    else if (type == StmtType::While)
+    {
+      assert(!isjump);
+      while_info now_while;
+      now_while.while_entry = "%while_entry_" + to_string(nowwhile);
+      now_while.while_body = "%while_body_" + to_string(nowwhile);
+      now_while.while_end = "\%while_end_" + to_string(nowwhile++);
+      cout << "\tjump " << now_while.while_entry << endl;
+      cout << endl
+           << now_while.while_entry << ":" << endl;
+      WhileTable.push_back(now_while);
+      string exp_res = exp->DumpIR();
+      cout << "\tbr " << exp_res << ", " << now_while.while_body << ", " << now_while.while_end << endl;
+      cout << endl
+           << now_while.while_body << ":" << endl;
+      stmt->DumpIR();
+      WhileTable.pop_back();
+      if (!isjump)
+      {
+        cout << "\tjump " << now_while.while_entry << endl;
+      }
+      cout << endl
+           << now_while.while_end << ":" << endl;
+      isjump = false;
+    }
+    else if (type == StmtType::Break)
+    {
+      assert(!WhileTable.empty());
+      while_info now_while = WhileTable.back();
+      cout << "\tjump " << now_while.while_end << endl;
+      isjump = true;
+    }
+    else if (type == StmtType::Continue)
+    {
+      assert(!WhileTable.empty());
+      while_info now_while = WhileTable.back();
+      cout << "\tjump " << now_while.while_entry << endl;
+      isjump = true;
     }
     return "";
   }
@@ -1202,11 +1259,8 @@ public:
     {
       return to_string(tmp_var->value);
     }
-    if (tmp_var->ir_value == "")
-    {
-      cout << "\t%" << now++ << " = load " << tmp_var->ir_symbol << endl;
-      tmp_var->ir_value = "%" + to_string(now - 1);
-    }
+    cout << "\t%" << now++ << " = load " << tmp_var->ir_symbol << endl;
+    tmp_var->ir_value = "%" + to_string(now - 1);
     return tmp_var->ir_value;
   }
 
