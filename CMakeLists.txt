@@ -45,6 +45,13 @@ link_directories(${LIB_DIR})
 
 # project include directories
 include_directories(src)
+include_directories(src/ast)
+include_directories(src/config)
+include_directories(src/lexer)
+include_directories(src/lib)
+include_directories(src/parser)
+include_directories(src/sysy_utils)
+include_directories(src/var)
 include_directories(${CMAKE_CURRENT_BINARY_DIR})
 include_directories(${INC_DIR})
 
