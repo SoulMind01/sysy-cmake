@@ -3,39 +3,102 @@ document.addEventListener("DOMContentLoaded", initButtons);
 
 class Grid
 {
-  constructor(containerElement) 
+  constructor(containerElement, wrapperElement) 
   {
     this.container = containerElement;
     this.items = [];
+    this.previousTopIndex = 1;
   }
 
   render()
   {
     this.container.innerHTML = "";
 
-    // Reverse order
-    this.items.slice().reverse().forEach((text, index) =>
-    {
-      const itemDiv = document.createElement("div");
-      itemDiv.className = "grid-item";
-      itemDiv.textContent = text;
-      this.container.appendChild(itemDiv);
-    });
-
     if (this.items.length === 0)
     {
       this.container.textContent = "Grid is empty.";
+      return;
     }
+
+    const currentTopIndex = 0;
+
+    // Reverse order
+    this.items.slice().reverse().forEach((item, index) =>
+    {
+      const itemDiv = document.createElement("div");
+      itemDiv.className = "grid-item";
+
+      // 1. Handle whether it's the top item
+      if (index === currentTopIndex)
+      {
+        itemDiv.classList.add("grid-item-top");
+        itemDiv.classList.add("grid-item-top-enter");
+        itemDiv.addEventListener(
+          "animationend",
+          () =>
+          {
+            itemDiv.classList.remove("grid-item-top-enter");
+          },
+          { once: true }
+        );
+      }
+      // If it's leaving the top position
+      else if (index === this.previousTopIndex)
+      {
+        itemDiv.classList.add("grid-item-top-leave");
+        itemDiv.addEventListener(
+          "animationend",
+          () =>
+          {
+            itemDiv.classList.remove("grid-item-top-leave");
+          },
+          { once: true }
+        );
+      }
+
+      // 2. Render words
+      const wordsDiv = document.createElement("div");
+      wordsDiv.className = "grid-item-words";
+
+      item.words.forEach((word, wIndex) =>
+      {
+        const span = document.createElement("span");
+        span.className = "grid-word";
+
+        // Highlight the pointing word
+        if (wIndex === item.pointer)
+        {
+          span.classList.add("grid-word-active");
+        }
+
+        span.textContent = word;
+        wordsDiv.appendChild(span);
+      });
+
+      itemDiv.appendChild(wordsDiv);
+      this.container.appendChild(itemDiv);
+    });
+
   }
 
-  push(itemText)
+  push(text)
   {
-    if (itemText === "")
+    if (text === "")
     {
       alert("Please enter text.");
       return;
     }
-    this.items.push(itemText);
+
+    const words = this.splitIntoWords(text);
+    console.log(words);
+
+    const item = {
+      raw: text,
+      words: words,
+      pointer: 0
+    };
+
+    this.items.push(item);
     this.render();
 
     // Add animation to the new item
@@ -78,6 +141,13 @@ class Grid
       { once: true }
     )
   }
+  splitIntoWords(text)
+  {
+    return text
+      .split(/\s+/)
+      .map(w => w.trim())
+      .filter(w => w.length > 0);
+  }
 }
 
 function initButtons()
@@ -102,5 +172,6 @@ function initButtons()
   popButton.addEventListener("click", () =>
   {
     grid.pop();
-  })
+  });
+
 }

@@ -61,3 +61,65 @@ body {
   background-color: #ffffff;
   border-top: 1px solid #ddd;
 }
+
+/* Word container inside grid item */
+.grid-item-words {
+  display: flex;
+  flex-wrap: wrap;
+  /* Allow words to wrap to the next line */
+  gap: 4px;
+}
+
+/* Individual word styling */
+.grid-work {
+  padding: 2px 6px;
+  border-radius: 4px;
+  background-color: #eee;
+  font-family: monospace;
+}
+
+/* Highlighted word */
+.grid-word-active {
+  background-color: #ffd54f;
+  font-weight: bold;
+}
+
+/* Top grid item highlight */
+.grid-item-top {
+  border-color: #42a5f5;
+  box-shadow: 0 0 8px rgba(66, 165, 245, 0.7);
+}
+
+/* Enter top grid item */
+.grid-item-top-enter {
+  animation: grid-top-enter 0.35s ease-out;
+}
+
+@keyframes grid-top-enter {
+  0% {
+    transform: translateY(-4px) scale(1.02);
+    box-shadow: 0 0 16px rgba(66, 165, 245, 1);
+  }
+
+  100% {
+    transform: translateY(0) scale(1);
+    box-shadow: 0 0 8px rgba(66, 165, 245, 0.7);
+  }
+}
+
+/* Leave top grid item */
+.grid-item-top-leave {
+  animation: grid-top-leave 1.25s ease-out;
+}
+
+@keyframes grid-top-leave {
+  0% {
+    border-color: #42a5f5;
+    box-shadow: 0 0 8px rgba(66, 165, 245, 0.7);
+  }
+
+  100% {
+    border-color: #999;
+    box-shadow: none;
+  }
+}
