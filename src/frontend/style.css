@@ -1,0 +1,44 @@
+#grid-container {
+  margin-top: 10px;
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 8px;
+  border: 1px solid #ccc;
+  padding: 10px;
+}
+
+.grid-item {
+  padding: 8px;
+  border: 1px solid #999;
+  background-color: #f8f8f8;
+}
+
+.grid-item.push-anim {
+  /*
+    animation" name duration timing-function delay iteration-count direction fill-mode play-state;
+  */
+  animation: grid-push-in 0.3s ease-out;
+}
+
+@keyframes grid-push-in {
+  from {
+    transform: translateY(-15px) scale(0.95);
+    opacity: 0;
+  }
+
+  to {
+    transform: translateY(0) scale(1);
+    opacity: 1;
+  }
+}
+
+.grid-item.pop-anim {
+  animation: grid-pop-out 0.25s ease-in forwards;
+}
+
+@keyframes grid-pop-out {
+  to {
+    transform: translateX(40px) scale(0.9);
+    opacity: 0;
+  }
+}
