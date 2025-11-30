@@ -3,11 +3,12 @@ document.addEventListener("DOMContentLoaded", initButtons);
 
 class Grid
 {
-  constructor(containerElement, wrapperElement) 
+  constructor(containerElement) 
   {
     this.container = containerElement;
     this.items = [];
     this.previousTopIndex = 1;
+    this.backendURL = "http://localhost:8080/result";
   }
 
   render()
@@ -37,6 +38,7 @@ class Grid
           "animationend",
           () =>
           {
+            console.log("Top item enter animation ended");
             itemDiv.classList.remove("grid-item-top-enter");
           },
           { once: true }
@@ -81,17 +83,16 @@ class Grid
 
   }
 
-  push(text)
+
+  _pushCore(text)
   {
     if (text === "")
     {
       alert("Please enter text.");
-      return;
+      return null;
     }
 
     const words = this.splitIntoWords(text);
-    console.log(words);
-
     const item = {
       raw: text,
       words: words,
@@ -101,21 +102,48 @@ class Grid
     this.items.push(item);
     this.render();
 
-    // Add animation to the new item
     const children = this.container.querySelectorAll(".grid-item");
-    const lastItemElement = children[0];
-    if (!lastItemElement) return;
+    const topElement = children[0] || null;
+    return topElement;
+  }
 
-    lastItemElement.classList.add("push-anim");
+  push(text)
+  {
+    const topElement = this._pushCore(text);
+    if (!topElement) return;
 
-    lastItemElement.addEventListener(
+    // Add animation to the new item
+    topElement.classList.add("push-anim");
+    topElement.addEventListener(
       "animationend",
       () =>
       {
-        lastItemElement.classList.remove("push-anim");
+        console.log("Push animation ended");
+        topElement.classList.remove("push-anim");
       },
       { once: true }
     );
+  }
+
+  async pushSequential(text)
+  {
+    const topElement = this._pushCore(text);
+    if (!topElement) return;
+
+    await new Promise((resolve) =>
+    {
+      topElement.classList.add("push-anim");
+
+      topElement.addEventListener(
+        "animationend",
+        () =>
+        {
+          topElement.classList.remove("push-anim");
+          resolve();
+        },
+        { once: true }
+      );
+    });
   }
 
   pop()
@@ -141,12 +169,41 @@ class Grid
       { once: true }
     )
   }
+
   splitIntoWords(text)
   {
     return text
       .split(/\s+/)
       .map(w => w.trim())
       .filter(w => w.length > 0);
+  }
+
+  async loadTextFromServer()
+  {
+    try
+    {
+      const response = await fetch(this.backendURL);
+      if (!response.ok)
+      {
+        console.error("Fetch error:", response.statusText);
+        return;
+      }
+
+      const text = await response.text();
+
+      const lines = text.trim().split(/\r?\n/);
+
+      const reversed = lines.slice().reverse();
+      for (const line of reversed)
+      {
+        if (line === "") continue;
+        await this.pushSequential(line);
+      }
+    }
+    catch (error)
+    {
+      console.error("Error fetching data from server:", error);
+    }
   }
 }
 
@@ -156,6 +213,7 @@ function initButtons()
   const input = document.getElementById("item-input");
   const pushButton = document.getElementById("push-button")
   const popButton = document.getElementById("pop-button")
+  const loadButton = document.getElementById("load-button");
 
 
   const grid = new Grid(gridContainer);
@@ -172,6 +230,11 @@ function initButtons()
   popButton.addEventListener("click", () =>
   {
     grid.pop();
+  });
+
+  loadButton.addEventListener("click", () =>
+  {
+    grid.loadTextFromServer();
   });
 
 }
