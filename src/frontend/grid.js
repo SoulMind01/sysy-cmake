@@ -38,7 +38,6 @@ class Grid
           "animationend",
           () =>
           {
-            console.log("Top item enter animation ended");
             itemDiv.classList.remove("grid-item-top-enter");
           },
           { once: true }
@@ -67,10 +66,36 @@ class Grid
         const span = document.createElement("span");
         span.className = "grid-word";
 
-        // Highlight the pointing word
+        // Static highlight
         if (wIndex === item.pointer)
         {
           span.classList.add("grid-word-active");
+          // If previous pointer is different, this word is newly activated. Add enter animation
+          if (item.prevPointer !== item.pointer)
+          {
+            span.classList.add("grid-word-active-enter")
+            span.addEventListener(
+              "animationend",
+              () =>
+              {
+                span.classList.remove("grid-word-active-enter");
+              },
+              { once: true }
+            );
+          }
+        }
+        // Handle leaving animation
+        else if (item.prevPointer === wIndex)
+        {
+          span.classList.add("grid-word-active-leave");
+          span.addEventListener(
+            "animationend",
+            () =>
+            {
+              span.classList.remove("grid-word-active-leave");
+            },
+            { once: true }
+          );
         }
 
         span.textContent = word;
@@ -81,6 +106,11 @@ class Grid
       this.container.appendChild(itemDiv);
     });
 
+    // Update previous pointer
+    this.items.forEach(item =>
+    {
+      item.prevPointer = item.pointer;
+    });
   }
 
 
@@ -92,11 +122,21 @@ class Grid
       return null;
     }
 
+    const indentMatch = text.match(/^\s*/);
+    const leadingIndent = indentMatch ? indentMatch[0] : "";
+
     const words = this.splitIntoWords(text);
+
+    if (leadingIndent.length > 0 && words.length > 0)
+    {
+      words[0] = leadingIndent + words[0];
+    }
+
     const item = {
       raw: text,
       words: words,
-      pointer: 0
+      pointer: 0,
+      prevPointer: null
     };
 
     this.items.push(item);
@@ -118,7 +158,6 @@ class Grid
       "animationend",
       () =>
       {
-        console.log("Push animation ended");
         topElement.classList.remove("push-anim");
       },
       { once: true }
@@ -205,6 +244,20 @@ class Grid
       console.error("Error fetching data from server:", error);
     }
   }
+
+  moveTopPointerNext()
+  {
+    if (this.items.length === 0) return;
+
+    const topItem = this.items[this.items.length - 1];
+    if (!topItem || topItem.words.length === 0) return;
+
+    topItem.prevPointer = topItem.pointer;
+    topItem.pointer = topItem.pointer + 1;
+
+    this.render();
+  }
+
 }
 
 function initButtons()
@@ -214,6 +267,7 @@ function initButtons()
   const pushButton = document.getElementById("push-button")
   const popButton = document.getElementById("pop-button")
   const loadButton = document.getElementById("load-button");
+  const nextWordButton = document.getElementById("next-word-button");
 
 
   const grid = new Grid(gridContainer);
@@ -235,6 +289,11 @@ function initButtons()
   loadButton.addEventListener("click", () =>
   {
     grid.loadTextFromServer();
+  });
+
+  nextWordButton.addEventListener("click", () =>
+  {
+    grid.moveTopPointerNext();
   });
 
 }
