@@ -7,8 +7,9 @@ class Grid
   {
     this.container = containerElement;
     this.items = [];
-    this.previousTopIndex = 1;
     this.backendURL = "http://localhost:8080/result";
+    this.pointerAnimChain = Promise.resolve();
+    this.pointerAnimResolver = null;
   }
 
   render()
@@ -44,7 +45,7 @@ class Grid
         );
       }
       // If it's leaving the top position
-      else if (index === this.previousTopIndex)
+      else if (index === 1)
       {
         itemDiv.classList.add("grid-item-top-leave");
         itemDiv.addEventListener(
@@ -79,6 +80,12 @@ class Grid
               () =>
               {
                 span.classList.remove("grid-word-active-enter");
+
+                if (this.pointerAnimResolver)
+                {
+                  this.pointerAnimResolver();
+                  this.pointerAnimResolver = null;
+                }
               },
               { once: true }
             );
@@ -247,15 +254,40 @@ class Grid
 
   moveTopPointerNext()
   {
-    if (this.items.length === 0) return;
+    this.pointerAnimChain = this.pointerAnimChain.then(() =>
+    {
+      return this._moveTopPointerOneStep();
+    });
+  }
 
-    const topItem = this.items[this.items.length - 1];
-    if (!topItem || topItem.words.length === 0) return;
+  _moveTopPointerOneStep()
+  {
+    return new Promise((resolve) =>
+    {
+      // No items
+      if (this.items.length === 0)
+      {
+        resolve();
+        return;
+      }
 
-    topItem.prevPointer = topItem.pointer;
-    topItem.pointer = topItem.pointer + 1;
+      // No words in top item
+      const topItem = this.items[this.items.length - 1];
+      if (!topItem || topItem.words.length === 0)
+      {
+        resolve();
+        return;
+      }
 
-    this.render();
+      // Record previous pointer, update pointer
+      topItem.prevPointer = topItem.pointer;
+      topItem.pointer = topItem.pointer + 1;
+
+      // Store this time's animation resolver for render to call later
+      this.pointerAnimResolver = resolve;
+
+      this.render();
+    });
   }
 
 }
