@@ -7,118 +7,9 @@ class Grid
     this.container = containerElement;
     this.items = [];
     this.backendURL = "http://localhost:8080/result";
+    this.renderer = new GridRenderer(this.container);
     this.pointerAnimChain = Promise.resolve();
-    this.pointerAnimResolver = null;
   }
-
-  render()
-  {
-    this.container.innerHTML = "";
-
-    if (this.items.length === 0)
-    {
-      this.container.textContent = "Grid is empty.";
-      return;
-    }
-
-    const currentTopIndex = 0;
-
-    // Reverse order
-    this.items.slice().reverse().forEach((item, index) =>
-    {
-      const itemDiv = document.createElement("div");
-      itemDiv.className = "grid-item";
-
-      // 1. Handle whether it's the top item
-      if (index === currentTopIndex)
-      {
-        itemDiv.classList.add("grid-item-top");
-        itemDiv.classList.add("grid-item-top-enter");
-        itemDiv.addEventListener(
-          "animationend",
-          () =>
-          {
-            itemDiv.classList.remove("grid-item-top-enter");
-          },
-          { once: true }
-        );
-      }
-      // If it's leaving the top position
-      else if (index === 1)
-      {
-        itemDiv.classList.add("grid-item-top-leave");
-        itemDiv.addEventListener(
-          "animationend",
-          () =>
-          {
-            itemDiv.classList.remove("grid-item-top-leave");
-          },
-          { once: true }
-        );
-      }
-
-      // 2. Render words
-      const wordsDiv = document.createElement("div");
-      wordsDiv.className = "grid-item-words";
-
-      item.words.forEach((word, wIndex) =>
-      {
-        const span = document.createElement("span");
-        span.className = "grid-word";
-
-        // Static highlight
-        if (wIndex === item.pointer)
-        {
-          span.classList.add("grid-word-active");
-          // If previous pointer is different, this word is newly activated. Add enter animation
-          if (item.prevPointer !== item.pointer)
-          {
-            span.classList.add("grid-word-active-enter")
-            span.addEventListener(
-              "animationend",
-              () =>
-              {
-                span.classList.remove("grid-word-active-enter");
-
-                if (this.pointerAnimResolver)
-                {
-                  this.pointerAnimResolver();
-                  this.pointerAnimResolver = null;
-                }
-              },
-              { once: true }
-            );
-          }
-        }
-        // Handle leaving animation
-        else if (item.prevPointer === wIndex)
-        {
-          span.classList.add("grid-word-active-leave");
-          span.addEventListener(
-            "animationend",
-            () =>
-            {
-              span.classList.remove("grid-word-active-leave");
-            },
-            { once: true }
-          );
-        }
-
-        span.textContent = word;
-        wordsDiv.appendChild(span);
-      });
-
-      itemDiv.appendChild(wordsDiv);
-      this.container.appendChild(itemDiv);
-    });
-
-    // Update previous pointer
-    this.items.forEach(item =>
-    {
-      item.prevPointer = item.pointer;
-    });
-  }
-
 
   _pushCore(text)
   {
@@ -146,9 +37,9 @@ class Grid
     };
 
     this.items.push(item);
-    this.render();
+    this.renderer.render(this.items);
 
-    const children = this.container.querySelectorAll(".grid-item");
+    const children = this.container.querySelectorAll("." + CSS_CLASS.gridItem);
     const topElement = children[0] || null;
     return topElement;
   }
@@ -159,12 +50,12 @@ class Grid
     if (!topElement) return;
 
     // Add animation to the new item
-    topElement.classList.add("push-anim");
+    topElement.classList.add(CSS_CLASS.pushAnim);
     topElement.addEventListener(
       "animationend",
       () =>
       {
-        topElement.classList.remove("push-anim");
+        topElement.classList.remove(CSS_CLASS.pushAnim);
       },
       { once: true }
     );
@@ -177,13 +68,13 @@ class Grid
 
     await new Promise((resolve) =>
     {
-      topElement.classList.add("push-anim");
+      topElement.classList.add(CSS_CLASS.pushAnim);
 
       topElement.addEventListener(
         "animationend",
         () =>
         {
-          topElement.classList.remove("push-anim");
+          topElement.classList.remove(CSS_CLASS.pushAnim);
           resolve();
         },
         { once: true }
@@ -195,21 +86,21 @@ class Grid
   {
     if (this.items.length === 0)
     {
-      this.render();
+      this.renderer.render(this.items);
       return;
     }
 
-    const children = this.container.querySelectorAll(".grid-item");
+    const children = this.container.querySelectorAll("." + CSS_CLASS.gridItem);
     const lastItemElement = children[0];
 
-    lastItemElement.classList.add("pop-anim");
+    lastItemElement.classList.add(CSS_CLASS.popAnim);
 
     lastItemElement.addEventListener(
       "animationend",
       () =>
       {
         this.items.pop();
-        this.render();
+        this.renderer.render(this.items);
       },
       { once: true }
     )
@@ -237,7 +128,6 @@ class Grid
       const text = await response.text();
 
       const lines = text.trim().split(/\r?\n/);
-
       const reversed = lines.slice().reverse();
       for (const line of reversed)
       {
@@ -283,9 +173,8 @@ class Grid
       topItem.pointer = topItem.pointer + 1;
 
       // Store this time's animation resolver for render to call later
-      this.pointerAnimResolver = resolve;
-
-      this.render();
+      this.renderer.setPointerAnimResolver(resolve);
+      this.renderer.render(this.items);
     });
   }
 
@@ -293,7 +182,7 @@ class Grid
 
 function initButtons()
 {
-  const gridContainer = document.getElementById("grid-container");
+  const gridContainer = document.getElementById(CSS_CLASS.gridContainer);
   const input = document.getElementById("item-input");
   const pushButton = document.getElementById("push-button")
   const popButton = document.getElementById("pop-button")
@@ -302,7 +191,7 @@ function initButtons()
 
 
   const grid = new Grid(gridContainer);
-  grid.render();
+  grid.renderer.render(grid.items);
 
   pushButton.addEventListener("click", () =>
   {
@@ -327,4 +216,11 @@ function initButtons()
     grid.moveTopPointerNext();
   });
 
+  debug(grid);
+}
+
+async function debug(grid)
+{
+  // Test loading from server
+  await grid.loadTextFromServer();
 }
