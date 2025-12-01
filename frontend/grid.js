@@ -143,6 +143,11 @@ class Grid
 
   moveTopPointerNext()
   {
+    if (this.items[this.items.length - 1]?.pointer == this.items[this.items.length - 1]?.words.length - 1)
+    {
+      this.pop();
+      return;
+    }
     this.pointerAnimChain = this.pointerAnimChain.then(() =>
     {
       return this._moveTopPointerOneStep();
