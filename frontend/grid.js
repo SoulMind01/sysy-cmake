@@ -6,7 +6,7 @@ class Grid
   {
     this.container = containerElement;
     this.items = [];
-    this.backendURL = "http://localhost:8080/result";
+    this.backendURL = "http://10.0.0.217:8080/result";
     this.renderer = new GridRenderer(this.container);
     this.pointerAnimChain = Promise.resolve();
   }
