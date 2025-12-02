@@ -2,8 +2,12 @@ document.addEventListener("DOMContentLoaded", main);
 function main()
 {
   const visual = new VisualLinker();
-  const testButton = document.getElementById("test-visual-button");
+
   const gridContainer = document.getElementById(CSS_CLASS.gridContainer);
+
+  const testButton = document.getElementById("test-visual-button");
+  const eraseButton = document.getElementById("erase-one");
+
   if (testButton)
   {
     testButton.addEventListener("click", async () =>
@@ -15,6 +19,14 @@ function main()
         const toEl = items[1];
         await visual.animateFlow(fromEl, toEl);
       }
+    });
+  }
+
+  if (eraseButton)
+  {
+    eraseButton.addEventListener("click", () =>
+    {
+      visual.eraseNextShape();
     });
   }
 }

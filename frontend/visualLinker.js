@@ -279,6 +279,33 @@ class VisualLinker
     });
   }
 
+  eraseNextShape()
+  {
+    if (this.activeShapes.length === 0) return;
+
+    const shape = this.activeShapes.shift();
+    const path = shape.svgElement;
+    if (!path) return;
+
+    // Use dash to erase animation
+    const len = path.getTotalLength();
+    path.style.setProperty("--path-len", len);
+
+    path.style.animation = "viz-erase-draw 0.4s ease-in-out forwards";
+
+    path.addEventListener(
+      "animationend",
+      () =>
+      {
+        if (path.parentNode === this.svg)
+        {
+          this.svg.removeChild(path);
+        }
+      },
+      { once: true }
+    );
+  }
+
   async animateFlow(fromEl, toEl)
   {
     await this.highlightBox(fromEl);
