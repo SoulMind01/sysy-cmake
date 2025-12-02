@@ -2,6 +2,9 @@
   display: grid;
   grid-template-columns: 1fr;
   gap: 8px;
+  width: 33%;
+  margin: 0 auto;
+  box-sizing: border-box;
 }
 
 .grid-item {
@@ -157,5 +160,93 @@ body {
   100% {
     border-color: #999;
     box-shadow: none;
+  }
+}
+
+/* The overlay SVG layer for visualization */
+.viz-overlay {
+  /* Cover the entire window */
+  position: fixed;
+  left: 0;
+  top: 0;
+  width: 100vw;
+  height: 100vh;
+  /* Do not block mouse events */
+  pointer-events: none;
+  z-index: 9999;
+}
+
+.viz-circle {
+  fill: rgba(255, 235, 59, 0.15);
+  /* Yellow with transparency */
+  stroke: #ffca28;
+  stroke-width: 3;
+  transform-origin: center center;
+  animation: viz-circle-pulse 0.4s ease-out forwards;
+}
+
+@keyframes viz-circle-pulse {
+  0% {
+    transform: scale(0.5);
+    opacity: 0;
+  }
+
+  80% {
+    transform: scale(1.05);
+    opacity: 1;
+  }
+
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+/* Draw highlighted rectangle around an element */
+.viz-outline-path {
+  fill: none;
+  stroke: #ffca28;
+  stroke-width: 3;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+
+  stroke-dasharray: var(--path-len, 0);
+  stroke-dashoffset: var(--path-len, 0);
+
+  animation: viz-outline-draw 0.5s ease-out forwards;
+}
+
+@keyframes viz-outline-draw {
+  from {
+    /* This will be overwritten by JS */
+    stroke-dashoffset: var(--path-len, 0);
+  }
+
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+/* Arrow arc path */
+.viz-arrow-path {
+  fill: none;
+  stroke: #42a5f5;
+  stroke-width: 3;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+
+  stroke-dasharray: var(--path-len, 0);
+  stroke-dashoffset: var(--path-len, 0);
+
+  animation: viz-arrow-draw 0.5s ease-in-out forwards;
+}
+
+@keyframes viz-arrow-draw {
+  from {
+    stroke-dashoffset: var(--path-len, 0);
+  }
+
+  to {
+    stroke-dashoffset: 0;
   }
 }
