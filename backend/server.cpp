@@ -1,22 +1,10 @@
 #include "server.h"
 
-bool is_allowed_origin(const std::string &origin)
-{
-  std::regex local_pattern(R"(http://localhost(:\d+)?$)");
-  std::regex local_network_pattern(R"(http://10.0.0.44(:\d+)?$)");
-  return std::regex_match(origin, local_pattern) || std::regex_match(origin, local_network_pattern);
-}
+httplib::Server svr;
 
-void handle_result(const httplib::Request &req, httplib::Response &res)
+bool is_allowed_ip(const std::string &origin)
 {
-  std::string body = read_file("./debug/hello.cpp");
-  res.set_content(body, "text/plain; charset=utf-8");
-  std::string origin = req.get_header_value("Origin");
-  if (is_allowed_origin(origin))
-  {
-    printf("Origin: %s\n", origin.c_str());
-    res.set_header("Access-Control-Allow-Origin", origin);
-  }
+  return allowed_ips.find(origin) != allowed_ips.end();
 }
 
 void start_server()
@@ -26,11 +14,10 @@ void start_server()
   svr.listen("0.0.0.0", 8080);
 }
 
-httplib::Server svr;
 void run_compiler(
-    std::string mode = "-koopa",
-    std::string input_file_path = "./debug/hello.cpp",
-    std::string output_file_path = "./debug/hello.koopa")
+    std::string mode,
+    std::string input_file_path,
+    std::string output_file_path)
 {
   std::string command = "./build/compiler " + mode + " " + input_file_path + " -o " + output_file_path;
   system(command.c_str());
@@ -49,6 +36,17 @@ std::string read_file(const std::string &path)
   return ss.str();
 }
 
+void handle_result(const httplib::Request &req, httplib::Response &res)
+{
+  run_compiler();
+  std::string body = read_file("./debug/instructions.txt");
+  res.set_content(body, "text/plain; charset=utf-8");
+  printf("Remote addr: %s\n", req.remote_addr.c_str());
+  if (is_allowed_ip(req.remote_addr))
+  {
+    res.set_header("Access-Control-Allow-Origin", req.get_header_value("Origin"));
+  }
+}
 int main()
 {
   printf("Starting server on port 8080...\n");

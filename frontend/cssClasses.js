@@ -19,4 +19,10 @@ window.CSS_CLASS = Object.freeze({
   gridWordActive: "grid-word-active",
   gridWordActiveEnter: "grid-word-active-enter",
   gridWordActiveLeave: "grid-word-active-leave",
+
+  // Visual linker
+  vizOverlay: "viz-overlay",
+  vizCircle: "viz-circle",
+  vizArrowPath: "viz-arrow-path",
+  vizOutlinePath: "viz-outline-path",
 });
