@@ -6,9 +6,6 @@ class VisualLinker
     this.svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
     this.svg.classList.add(CSS_CLASS.vizOverlay);
 
-    // Define arrow head marker
-    this._initDefs();
-
     document.body.appendChild(this.svg);
 
     // Store all active shapes
@@ -122,28 +119,6 @@ class VisualLinker
     ].join(" ");
 
     path.setAttribute("d", d);
-  }
-
-  _initDefs()
-  {
-    const defs = document.createElementNS("http://www.w3.org/2000/svg", "defs");
-    const marker = document.createElementNS("http://www.w3.org/2000/svg", "marker");
-    marker.setAttribute("id", "viz-arrow-head");
-    marker.setAttribute("markerWidth", "10");
-    marker.setAttribute("markerHeight", "10");
-    marker.setAttribute("refX", "8");
-    marker.setAttribute("refY", "5");
-    marker.setAttribute("orient", "auto");
-    marker.setAttribute("markerUnits", "strokeWidth");
-
-    // Arrow head shape definition
-    const arrowHead = document.createElementNS("http://www.w3.org/2000/svg", "path");
-    arrowHead.setAttribute("d", "M 0 0 L 10 5 L 0 10 z");
-    arrowHead.setAttribute("fill", "#42a5f5");
-
-    marker.appendChild(arrowHead);
-    defs.appendChild(marker);
-    this.svg.appendChild(defs);
   }
 
   // Helper: create a SVG element
@@ -263,35 +238,25 @@ class VisualLinker
       const endX = r2.left;
       const endY = r2.top + r2.height / 2;
 
-      // In order to make the arrow curve, we first draw a horizontal line, then connect with cubic Bezier curve
+      // Control point
+      const midY = (startY + endY) / 2;
       const offset = Math.max(40, Math.min(120, Math.abs(endX - startX) / 3));
 
       // Extends towards right
-      const p1x = startX + offset;
-      const p1y = startY;
-
-      // Extends towards left when approaching target
-      const p4x = endX - offset;
-      const p4y = endY;
-
-      // Control point: When approaching p1/p4, start banding vertically in order to create curve
-      const midY = (startY + endY) / 2;
-      const c1x = p1x;
+      const c1x = startX + offset;
       const c1y = midY;
-      const c2x = p4x;
+
+      const c2x = endX - offset;
       const c2y = midY;
 
-      // C for cubic Bezier curve
       const d = [
         `M ${startX} ${startY}`, // Start: Mid of right edge
-        `L ${p1x} ${p1y}`, // Move right
         `C ${c1x} ${c1y} ${c2x} ${c2y} ${endX} ${endY}`
       ].join(" ");
 
       const path = this._createSvgElement("path");
       path.setAttribute("d", d);
       path.classList.add(CSS_CLASS.vizArrowPath);
-      path.setAttribute("marker-end", "url(#viz-arrow-head)");
 
       this.svg.appendChild(path);
 

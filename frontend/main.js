@@ -9,7 +9,6 @@ function main()
     testButton.addEventListener("click", async () =>
     {
       const items = gridContainer.querySelectorAll("." + CSS_CLASS.gridItem);
-      console.log("Items:", items);
       if (items.length >= 2)
       {
         const fromEl = items[0];
